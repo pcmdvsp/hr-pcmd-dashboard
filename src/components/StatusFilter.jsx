@@ -2,7 +2,7 @@ import { STATUS } from '../utils/status'
 import './StatusFilter.css'
 
 export default function StatusFilter({ value, onChange, departmentValue, onDepartmentChange, departments }) {
-  const statusFilters = Object.entries(STATUS).flatMap(([key, item]) => key === 'working'
+  const statusFilters = Object.entries(STATUS).filter(([key]) => key !== 'meeting').flatMap(([key, item]) => key === 'working'
     ? [['all', { label: 'All' }], [key, item]]
     : [[key, item]])
 

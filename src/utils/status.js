@@ -1,6 +1,7 @@
 export const STATUS = {
   working: { label: 'Working', color: '#2ecc71', className: 'working' },
   business_trip: { label: 'Business trip', color: '#f1c40f', className: 'business-trip' },
+  meeting: { label: 'Meeting', color: '#8e5ac7', className: 'meeting' },
   leave: { label: 'Annual leave', color: '#3498db', className: 'leave' },
   sick: { label: 'Sick leave', color: '#e74c3c', className: 'sick' },
 }

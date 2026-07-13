@@ -14,6 +14,7 @@ import UpdateStatusPage from './pages/UpdateStatusPage'
 import AdminPage from './pages/AdminPage'
 import MonthlyStatsPage from './pages/MonthlyStatsPage'
 import WorkCalendarPage from './pages/WorkCalendarPage'
+import MeetingInfoPage from './pages/MeetingInfoPage'
 
 function App() {
   const { session, profile, refreshProfile } = useAuth(); const location = useLocation(); const navigate = useNavigate(); const selectedDate = new URLSearchParams(location.search).get('date') || today(); const data = useDashboard(selectedDate); const [page, setPage] = useState('dashboard')
@@ -25,8 +26,9 @@ function App() {
   if (location.pathname === '/update') return <UpdateStatusPage profile={profile}/>
   const signout = () => supabase.auth.signOut()
   if (page === 'monthly') return <MonthlyStatsPage profile={profile} goBack={() => setPage('dashboard')} />
+  if (page === 'meeting') return <MeetingInfoPage profile={profile} goBack={() => setPage('dashboard')} />
   if (page === 'calendar' && profile.role === 'admin') return <WorkCalendarPage goBack={() => setPage('dashboard')} />
-  return page === 'admin' && profile.role === 'admin' ? <AdminPage data={data} goBack={() => setPage('dashboard')}/> : <Dashboard profile={profile} data={data} onSignOut={signout} goAdmin={() => setPage('admin')} goMonthly={() => setPage('monthly')} goCalendar={() => setPage('calendar')} onDateChange={date => navigate(`/?date=${date}`)}/>
+  return page === 'admin' && profile.role === 'admin' ? <AdminPage data={data} goBack={() => setPage('dashboard')}/> : <Dashboard profile={profile} data={data} onSignOut={signout} goAdmin={() => setPage('admin')} goMonthly={() => setPage('monthly')} goMeeting={() => setPage('meeting')} goCalendar={() => setPage('calendar')} onDateChange={date => navigate(`/?date=${date}`)}/>
 }
 
 createRoot(document.getElementById('root')).render(<StrictMode><HashRouter><App/></HashRouter></StrictMode>)

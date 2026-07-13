@@ -3,11 +3,6 @@ import { STATUS, statusLabel, formatDateTime } from '../utils/status'
 const shortDate = date => new Intl.DateTimeFormat('en-GB').format(new Date(`${date}T00:00:00`))
 
 export default function EmployeeBadge({ employee, onClick, editable = false }) {
-  const status = STATUS[employee.displayStatus]
-  const period = employee.dailyPeriod
-  return <button className={`employee-badge ${editable ? 'is-editable' : ''}`} onClick={() => editable && onClick(employee)}>
-    <span className="employee-status-dot" style={{ backgroundColor: status.color }} />
-    <span className="employee-name">{employee.full_name}</span>
-    <span className="employee-tooltip"><b>{employee.full_name}</b><br />Employee ID: {employee.employee_code}<br />Status: {statusLabel(employee.displayStatus)}{period && <><br />Period: {shortDate(period.start)} - {shortDate(period.end)}</>}{employee.daily?.note && <><br />Note: {employee.daily.note}</>}{employee.daily?.updated_at && <><br />Updated: {formatDateTime(employee.daily.updated_at)}</>}</span>
-  </button>
+  const status = STATUS[employee.displayStatus]; const period = employee.dailyPeriod
+  return <button className={`employee-badge ${editable ? 'is-editable' : ''}`} onClick={() => editable && onClick(employee)}><span className="employee-status-dot" style={{ backgroundColor: status.color }} /><span className="employee-name">{employee.full_name}</span><span className="employee-tooltip"><b>{employee.full_name}</b><br />Employee ID: {employee.employee_code}<br />Status: {statusLabel(employee.displayStatus)}{period && <><br />Period: {shortDate(period.start)} - {shortDate(period.end)}</>}{employee.daily?.content && <><br />Content: {employee.daily.content}</>}{employee.daily?.location && <><br />Location: {employee.daily.location}</>}{employee.daily?.note && <><br />Note: {employee.daily.note}</>}{employee.daily?.updated_at && <><br />Updated: {formatDateTime(employee.daily.updated_at)}</>}</span></button>
 }
