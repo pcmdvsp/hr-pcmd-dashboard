@@ -1,0 +1,1 @@
+export default function SearchBox({ value, onChange }) { return <label className="search-box"><span>⌕</span><input value={value} onChange={e => onChange(e.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên" /></label> }

@@ -1,0 +1,9 @@
+.department-filter {
+  border: 1px solid #d6e0eb;
+  background: #fff;
+  color: #34516f;
+  border-radius: 8px;
+  padding: 8px 34px 8px 11px;
+  cursor: pointer;
+  outline-color: #4d8bc7;
+}

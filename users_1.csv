@@ -1,0 +1,4 @@
+﻿id,email,employee_code,full_name,department_id,role,position,active,must_change_password
+2f5cb171-e898-4243-885d-8e03556f4139,thenv.pt@vietsov.com.vn,16269,Nguyễn Văn Thể,a619ce92-fdaa-42c4-91d2-5db40592cc6a,normal,Trưởng Lô,TRUE,TRUE
+837fa9de-f504-4fbc-923e-d6c157315317,hoanhv.pt@vietsov.com.vn,16875,Hồ Văn Hoàn,2b9f0a56-386c-4599-b262-aec6f609bdbc,normal,Trưởng Lô,TRUE,TRUE
+a135c7d7-9ee6-4a7d-adfd-795c0e88bd9e,uyenph.rd@vietsov.com.vn,20444,Phạm Hoàng Uyên,2b9f0a56-386c-4599-b262-aec6f609bdbc,normal,Kỹ sư,TRUE,TRUE

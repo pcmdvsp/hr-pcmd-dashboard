@@ -1,0 +1,180 @@
+import { useMemo, useState } from "react";
+import "../dashboard.css";
+import DepartmentCard from "../components/DepartmentCard";
+import StatusFilter from "../components/StatusFilter";
+import SearchBox from "../components/SearchBox";
+import StatusForm from "../components/StatusForm";
+import StatusOverview from "../components/StatusOverview";
+import ResetPasswordDialog from "../components/ResetPasswordDialog";
+import { formatDate, formatDateTime, today } from "../utils/status";
+
+export default function Dashboard({
+  profile,
+  data,
+  onSignOut,
+  goAdmin,
+  goMonthly,
+  goCalendar,
+  onDateChange,
+}) {
+  const { employees, departments, loading, error, date, reload } = data;
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [edit, setEdit] = useState(null);
+  const [resetPassword, setResetPassword] = useState(false);
+  const visible = useMemo(
+    () =>
+      employees.filter(
+        (employee) =>
+          (filter === "all" || employee.displayStatus === filter) &&
+          `${employee.full_name} ${employee.employee_code}`
+            .toLowerCase()
+            .includes(query.toLowerCase()),
+      ),
+    [employees, filter, query],
+  );
+  const leaders =
+    departmentFilter === "all" || departmentFilter === "leadership"
+      ? visible.filter((employee) => !employee.department_id)
+      : [];
+  const visibleDepartments = useMemo(
+    () =>
+      departments
+        .filter(
+          (department) =>
+            departmentFilter === "all" || department.id === departmentFilter,
+        )
+        .map((department) => ({
+          ...department,
+          employees: visible.filter(
+            (employee) => employee.department_id === department.id,
+          ),
+        }))
+        .filter((department) => department.employees.length > 0),
+    [departments, visible, departmentFilter],
+  );
+  const latest = employees
+    .map((employee) => employee.daily?.updated_at)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+
+  return (
+    <main className="app-shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">TRẠNG THÁI LÀM VIỆC HẰNG NGÀY</p>
+          <h1>Dashboard Nhân sự Ban</h1>
+          <p className="subtle">
+            {formatDate(date)} · Cập nhật gần nhất: {formatDateTime(latest)}
+          </p>
+        </div>
+        <div className="top-actions">
+          <span className="user-chip">{profile.full_name}</span>
+          <button className="secondary-button" onClick={goMonthly}>
+            Thống kê tháng
+          </button>
+          <a
+            className="secondary-button update-link"
+            href="#/update"
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: "none" }}
+          >
+            Cập nhật
+          </a>
+          {profile.role === "admin" && (
+            <>
+              <button className="secondary-button" onClick={goAdmin}>
+                Quản trị
+              </button>
+              <button className="secondary-button" onClick={goCalendar}>
+                Work calendar
+              </button>
+              <button
+                className="secondary-button reset-button"
+                onClick={() => setResetPassword(true)}
+              >
+                Reset password
+              </button>
+            </>
+          )}
+          <button className="text-button" onClick={onSignOut}>
+            Đăng xuất
+          </button>
+        </div>
+      </header>
+      <StatusOverview employees={employees} />
+      <section className="toolbar">
+        <SearchBox value={query} onChange={setQuery} />
+        <label className="dashboard-date">
+          Hiển thị ngày
+          <input
+            type="date"
+            min={today()}
+            value={date}
+            onChange={(event) => onDateChange(event.target.value)}
+          />
+        </label>
+        <StatusFilter
+          value={filter}
+          onChange={setFilter}
+          departmentValue={departmentFilter}
+          onDepartmentChange={setDepartmentFilter}
+          departments={departments}
+        />
+      </section>
+      {error && <p className="notice error">{error}</p>}
+      {loading ? (
+        <p className="loading">Đang tải dữ liệu...</p>
+      ) : (
+        <>
+          {leaders.length > 0 && (
+            <section className="leadership-section">
+              <div className="leadership-list">
+                <DepartmentCard
+                  department={{ name: "Ban lãnh đạo" }}
+                  employees={leaders}
+                  editable={profile.role === "admin"}
+                  onEmployeeClick={setEdit}
+                />
+              </div>
+            </section>
+          )}
+          <section className="department-grid">
+            {visibleDepartments.map((department) => (
+              <DepartmentCard
+                key={department.id}
+                department={department}
+                employees={department.employees}
+                editable={profile.role === "admin"}
+                onEmployeeClick={setEdit}
+              />
+            ))}
+          </section>
+          {visible.length === 0 && (
+            <p className="empty">Không tìm thấy nhân sự phù hợp.</p>
+          )}
+        </>
+      )}
+      {edit && (
+        <div className="modal-backdrop">
+          <div className="modal">
+            <StatusForm
+              employee={edit}
+              onSaved={reload}
+              onClose={() => setEdit(null)}
+            />
+          </div>
+        </div>
+      )}
+      {resetPassword && (
+        <ResetPasswordDialog
+          employees={employees}
+          onClose={() => setResetPassword(false)}
+        />
+      )}
+    </main>
+  );
+}
