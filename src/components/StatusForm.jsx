@@ -3,56 +3,12 @@ import { supabase } from '../lib/supabaseClient'
 import { STATUS, today } from '../utils/status'
 
 const selectableStatuses = ['sick', 'leave', 'business_trip', 'working']
-const notePlaceholders = {
-  leave: 'Location of annual leave',
-  business_trip: 'Location and purpose of business trip',
-  sick: 'Kind of sickness',
-}
+const notePlaceholders = { leave: 'Location of annual leave', business_trip: 'Location and purpose of business trip', sick: 'Type of illness' }
 
 export default function StatusForm({ employee, onSaved, onClose }) {
-  const [status, setStatus] = useState('leave')
-  const [startDate, setStartDate] = useState(today())
-  const [endDate, setEndDate] = useState(today())
-  const [note, setNote] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    setStatus(employee.displayStatus || 'working')
-    setNote(employee.daily?.note || '')
-    setSaved(false)
-  }, [employee])
-
+  const [status, setStatus] = useState('leave'); const [startDate, setStartDate] = useState(today()); const [endDate, setEndDate] = useState(today()); const [note, setNote] = useState(''); const [saving, setSaving] = useState(false); const [saved, setSaved] = useState(false); const [error, setError] = useState('')
+  useEffect(() => { setStatus(employee.displayStatus || 'working'); setNote(employee.daily?.note || ''); setSaved(false) }, [employee])
   const markChanged = () => setSaved(false)
-  const submit = async (event) => {
-    event.preventDefault()
-    if (endDate < startDate) return setError('Ngày kết thúc phải từ ngày bắt đầu trở đi.')
-    setSaving(true); setError('')
-    const dates = []
-    const cursor = new Date(`${startDate}T00:00:00`)
-    const last = new Date(`${endDate}T00:00:00`)
-    while (cursor <= last) {
-      dates.push(cursor.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }))
-      cursor.setDate(cursor.getDate() + 1)
-    }
-    const result = status === 'working'
-      ? await supabase.from('daily_status').delete().eq('employee_id', employee.id).in('date', dates)
-      : await supabase.from('daily_status').upsert(
-        dates.map(date => ({ employee_id: employee.id, date, status, note: note.trim() || null })),
-        { onConflict: 'employee_id,date' },
-      )
-    setSaving(false)
-    if (result.error) return setError(result.error.message)
-    setSaved(true)
-    onSaved?.(); onClose?.()
-  }
-
-  return <form className="status-form" onSubmit={submit}>
-    <div className="form-title"><div><p className="eyebrow">CẬP NHẬT TRẠNG THÁI</p><h2>{employee.full_name}</h2></div>{onClose && <button type="button" className="close" onClick={onClose}>×</button>}</div>
-    <label>Trạng thái<select value={status} onChange={event => { setStatus(event.target.value); markChanged() }}>{selectableStatuses.map(key => <option key={key} value={key}>{STATUS[key].label}</option>)}</select></label>
-    <div className="date-range" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}><label>Từ ngày<input type="date" min={today()} value={startDate} onChange={event => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged() }} /></label><label>Đến ngày<input type="date" min={startDate} value={endDate} onChange={event => { setEndDate(event.target.value); markChanged() }} /></label></div>
-    {status !== 'working' && <label>Ghi chú<textarea value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}
-    {error && <p className="form-error">{error}</p>}<button className="primary-button" disabled={saving}>{saving ? 'Đang lưu...' : saved ? 'Đã lưu thông tin' : 'Lưu trạng thái'}</button>
-  </form>
+  const submit = async event => { event.preventDefault(); if (endDate < startDate) return setError('The end date must not be earlier than the start date.'); setSaving(true); setError(''); const dates = []; const cursor = new Date(`${startDate}T00:00:00`); const last = new Date(`${endDate}T00:00:00`); while (cursor <= last) { dates.push(cursor.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' })); cursor.setDate(cursor.getDate() + 1) }; const result = status === 'working' ? await supabase.from('daily_status').delete().eq('employee_id', employee.id).in('date', dates) : await supabase.from('daily_status').upsert(dates.map(date => ({ employee_id: employee.id, date, status, note: note.trim() || null })), { onConflict: 'employee_id,date' }); setSaving(false); if (result.error) return setError(result.error.message); setSaved(true); onSaved?.(); onClose?.() }
+  return <form className="status-form" onSubmit={submit}><div className="form-title"><div><p className="eyebrow">UPDATE STATUS</p><h2>{employee.full_name}</h2></div>{onClose && <button type="button" className="close" onClick={onClose} aria-label="Close">×</button>}</div><label>Status<select value={status} onChange={event => { setStatus(event.target.value); markChanged() }}>{selectableStatuses.map(key => <option key={key} value={key}>{STATUS[key].label}</option>)}</select></label><div className="date-range" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}><label>From date<input type="date" min={today()} value={startDate} onChange={event => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged() }} /></label><label>To date<input type="date" min={startDate} value={endDate} onChange={event => { setEndDate(event.target.value); markChanged() }} /></label></div>{status !== 'working' && <label>Note<textarea value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}{error && <p className="form-error">{error}</p>}<button className="primary-button" disabled={saving}>{saving ? 'Saving...' : saved ? 'Saved' : 'Save status'}</button></form>
 }

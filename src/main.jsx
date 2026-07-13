@@ -16,16 +16,11 @@ import MonthlyStatsPage from './pages/MonthlyStatsPage'
 import WorkCalendarPage from './pages/WorkCalendarPage'
 
 function App() {
-  const { session, profile, refreshProfile } = useAuth()
-  const location = useLocation()
-  const navigate = useNavigate()
-  const selectedDate = new URLSearchParams(location.search).get('date') || today()
-  const data = useDashboard(selectedDate)
-  const [page, setPage] = useState('dashboard')
-  if (!isSupabaseConfigured) return <main className="auth-layout"><div className="auth-card"><h1>Thiếu cấu hình Supabase</h1><p>Sao chép <code>.env.example</code> thành <code>.env.local</code> và nhập URL, anon key của dự án Supabase.</p></div></main>
-  if (session === undefined || profile === undefined) return <main className="auth-layout">Đang khởi tạo...</main>
+  const { session, profile, refreshProfile } = useAuth(); const location = useLocation(); const navigate = useNavigate(); const selectedDate = new URLSearchParams(location.search).get('date') || today(); const data = useDashboard(selectedDate); const [page, setPage] = useState('dashboard')
+  if (!isSupabaseConfigured) return <main className="auth-layout"><div className="auth-card"><h1>Supabase configuration is missing</h1><p>Copy <code>.env.example</code> to <code>.env.local</code>, then enter your Supabase project URL and anon key.</p></div></main>
+  if (session === undefined || profile === undefined) return <main className="auth-layout">Initializing...</main>
   if (!session) return <LoginPage/>
-  if (!profile) return <main className="auth-layout"><div className="auth-card"><h1>Không tìm thấy hồ sơ</h1><p>Tài khoản đã đăng nhập nhưng chưa có bản ghi profiles. Hãy liên hệ quản trị viên.</p></div></main>
+  if (!profile) return <main className="auth-layout"><div className="auth-card"><h1>Profile not found</h1><p>You are signed in, but this account does not have a profiles record. Please contact an administrator.</p></div></main>
   if (profile.must_change_password) return <ChangePasswordPage refreshProfile={refreshProfile}/>
   if (location.pathname === '/update') return <UpdateStatusPage profile={profile}/>
   const signout = () => supabase.auth.signOut()

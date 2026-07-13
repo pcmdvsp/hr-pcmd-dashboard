@@ -1,1 +1,1 @@
-export default function SearchBox({ value, onChange }) { return <label className="search-box"><span>⌕</span><input value={value} onChange={e => onChange(e.target.value)} placeholder="Tìm theo tên hoặc mã nhân viên" /></label> }
+export default function SearchBox({ value, onChange }) { return <label className="search-box"><span>⌕</span><input value={value} onChange={event => onChange(event.target.value)} placeholder="Search by name or employee ID" /></label> }
