@@ -1,0 +1,151 @@
+.dashboard-navigation {
+  display: flex;
+  gap: 10px;
+  margin: 4px 0 20px;
+}
+
+.operations-header {
+  align-items: center;
+  padding: 18px 22px;
+  border: 1px solid #65758d;
+  border-radius: 15px;
+  background: linear-gradient(110deg, #526176, #45546a);
+  box-shadow: 0 7px 18px #263d5a24;
+}
+
+.operations-header .eyebrow,
+.operations-header h1,
+.operations-header .subtle {
+  color: #fff;
+}
+
+.operations-header h1 {
+  font-size: 28px;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.operations-header .eyebrow { opacity: .75; }
+.operations-header .subtle { margin: 5px 0 0; opacity: .8; }
+
+.operations-header .dashboard-date-badge {
+  margin-top: 9px;
+  border-color: #8290a4;
+  background: #354257;
+  color: #fff;
+}
+
+.header-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 12px;
+  border-radius: 9px;
+  background: #26354a;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.header-live i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #28d17c;
+}
+
+.operations-header .secondary-button,
+.operations-header .text-button {
+  border-color: #8190a3;
+  background: #f8fafc;
+}
+
+.operations-header .user-chip { background: #dce7f2; }
+
+.dashboard-navigation .secondary-button {
+  padding: 9px 15px;
+}
+
+.dashboard-date-badge {
+  display: inline-flex;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border: 1px solid #dbe5ef;
+  border-radius: 999px;
+  background: #f7fafd;
+  color: #49627b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dashboard-empty {
+  display: grid;
+  place-items: center;
+  gap: 8px;
+  min-height: 150px;
+  border: 1px dashed #cddbe8;
+  border-radius: 14px;
+  background: #fbfdff;
+  color: #718095;
+}
+
+.dashboard-empty span {
+  color: #8ba4bb;
+  font-size: 28px;
+}
+
+.status-overview {
+  margin-bottom: 30px;
+}
+
+.toolbar {
+  margin: 30px 0;
+}
+
+.department-card {
+  border-top-width: 3px;
+  border-radius: 13px;
+  box-shadow: 0 5px 14px #263d5a0d;
+}
+
+.department-card header {
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e9eef4;
+}
+
+.department-card h2 {
+  font-size: 17px;
+  letter-spacing: .01em;
+}
+
+.mini-summary {
+  margin: 13px 0 14px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.monthly-table-wrap,
+.calendar-admin {
+  border-radius: 14px;
+  box-shadow: 0 5px 16px #263d5a0d;
+}
+
+.monthly-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: #dbe5f1;
+  color: #34455b;
+  font-size: 11px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.monthly-table tbody tr:hover { background: #f6f9fc; }
+
+@media (max-width: 640px) {
+  .dashboard-navigation { overflow-x: auto; }
+  .dashboard-navigation .secondary-button { flex: 0 0 auto; }
+}

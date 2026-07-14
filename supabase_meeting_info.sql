@@ -49,7 +49,7 @@ begin
         and s.start_time < new.end_time
         and s.end_time > new.start_time
     ) then
-      raise exception 'The meeting room has been reserved for the selected time';
+      raise exception 'The meeting room has been reserved for the selected time. Please choose different time!';
     end if;
   end if;
   return new;
@@ -60,3 +60,77 @@ drop trigger if exists daily_status_knt_meeting_room_check on public.daily_statu
 create trigger daily_status_knt_meeting_room_check
 before insert or update of status, date, location, start_time, end_time on public.daily_status
 for each row execute function public.validate_knt_meeting_room_reservation();
+
+-- Multiple meetings can occur on the same day, so they are stored separately
+-- from daily_status (which has one row per employee/day).
+create table if not exists public.employee_meetings (
+  id uuid primary key default gen_random_uuid(),
+  organizer_id uuid not null references public.profiles(id) on delete cascade,
+  date date not null,
+  content text not null,
+  location text not null,
+  start_time time not null,
+  end_time time not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (end_time >= start_time)
+);
+
+create table if not exists public.employee_meeting_attendees (
+  meeting_id uuid not null references public.employee_meetings(id) on delete cascade,
+  employee_id uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (meeting_id, employee_id)
+);
+
+create index if not exists employee_meetings_organizer_date_idx on public.employee_meetings(organizer_id, date);
+create index if not exists employee_meetings_date_idx on public.employee_meetings(date);
+
+drop trigger if exists employee_meetings_updated on public.employee_meetings;
+create trigger employee_meetings_updated before update on public.employee_meetings for each row execute function public.set_updated_at();
+
+alter table public.employee_meetings enable row level security;
+alter table public.employee_meeting_attendees enable row level security;
+drop policy if exists "employee meetings readable" on public.employee_meetings;
+drop policy if exists "organizers manage employee meetings" on public.employee_meetings;
+create policy "employee meetings readable" on public.employee_meetings for select to authenticated using (true);
+create policy "organizers manage employee meetings" on public.employee_meetings for all to authenticated
+  using (public.is_admin() or organizer_id = auth.uid())
+  with check (public.is_admin() or organizer_id = auth.uid());
+drop policy if exists "employee meeting attendees readable" on public.employee_meeting_attendees;
+drop policy if exists "organizers manage employee meeting attendees" on public.employee_meeting_attendees;
+create policy "employee meeting attendees readable" on public.employee_meeting_attendees for select to authenticated using (true);
+create policy "organizers manage employee meeting attendees" on public.employee_meeting_attendees for all to authenticated
+  using (public.is_admin() or exists (select 1 from public.employee_meetings m where m.id = meeting_id and m.organizer_id = auth.uid()))
+  with check (public.is_admin() or exists (select 1 from public.employee_meetings m where m.id = meeting_id and m.organizer_id = auth.uid()));
+-- A participant may remove only their own attendance when another status
+-- (business trip, annual leave, or sick leave) replaces their Meeting.
+drop policy if exists "participants leave employee meetings" on public.employee_meeting_attendees;
+create policy "participants leave employee meetings" on public.employee_meeting_attendees for delete to authenticated
+  using (employee_id = auth.uid() or public.is_admin());
+
+create or replace function public.validate_knt_employee_meeting_room_reservation()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  if new.location = 'KNT meeting room' then
+    perform pg_advisory_xact_lock(hashtext(new.date::text || new.location));
+    if exists (select 1 from public.employee_meetings m where m.id is distinct from new.id and m.date = new.date and m.location = 'KNT meeting room' and m.start_time < new.end_time and m.end_time > new.start_time) then
+      raise exception 'The meeting room has been reserved for the selected time. Please choose different time!';
+    end if;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists employee_meetings_knt_room_check on public.employee_meetings;
+create trigger employee_meetings_knt_room_check before insert or update of date, location, start_time, end_time on public.employee_meetings for each row execute function public.validate_knt_employee_meeting_room_reservation();
+
+-- Migrate existing Meeting records created before this change, then remove them
+-- from daily_status so each new meeting is independent.
+insert into public.employee_meetings(id, organizer_id, date, content, location, start_time, end_time, created_at, updated_at)
+select id, employee_id, date, coalesce(content, 'Meeting'), coalesce(location, 'Not specified'), coalesce(start_time, time '00:00'), coalesce(end_time, time '00:00'), created_at, updated_at
+from public.daily_status where status = 'meeting'
+on conflict (id) do nothing;
+insert into public.employee_meeting_attendees(meeting_id, employee_id, created_at)
+select a.daily_status_id, a.employee_id, a.created_at from public.daily_status_attendees a join public.daily_status s on s.id = a.daily_status_id where s.status = 'meeting'
+on conflict do nothing;
+delete from public.daily_status where status = 'meeting';
