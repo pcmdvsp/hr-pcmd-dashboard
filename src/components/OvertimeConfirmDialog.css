@@ -1,0 +1,24 @@
+.overtime-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(18, 39, 59, .62);
+  backdrop-filter: blur(3px);
+}
+
+.overtime-confirm-dialog {
+  width: min(480px, 100%);
+  padding: 28px;
+  background: #fff;
+  border: 1px solid #d7e3ee;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(14, 36, 56, .35);
+}
+
+.overtime-confirm-dialog .eyebrow { margin: 0 0 8px; }
+.overtime-confirm-dialog h2 { margin: 0; color: #1d3856; font-size: 22px; line-height: 1.35; }
+.overtime-confirm-actions { display: flex; justify-content: flex-end; gap: 12px; margin-top: 24px; }
+.overtime-confirm-actions button { min-width: 100px; margin: 0; }

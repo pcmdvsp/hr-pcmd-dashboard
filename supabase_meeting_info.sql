@@ -76,6 +76,16 @@ create table if not exists public.employee_meetings (
   check (end_time >= start_time)
 );
 
+alter table public.employee_meetings add column if not exists online_link text;
+
+-- Overtime records are explicit exceptions on weekends. A normal working day
+-- continues to have no daily_status row unless another status is registered.
+alter table public.daily_status add column if not exists is_overtime boolean not null default false;
+alter table public.daily_status drop constraint if exists daily_status_status_check;
+alter table public.daily_status add constraint daily_status_status_check
+  check (status in ('working', 'business_trip', 'leave', 'sick', 'meeting'));
+alter table public.employee_meetings add column if not exists is_overtime boolean not null default false;
+
 create table if not exists public.employee_meeting_attendees (
   meeting_id uuid not null references public.employee_meetings(id) on delete cascade,
   employee_id uuid not null references public.profiles(id) on delete cascade,
@@ -108,6 +118,23 @@ create policy "organizers manage employee meeting attendees" on public.employee_
 drop policy if exists "participants leave employee meetings" on public.employee_meeting_attendees;
 create policy "participants leave employee meetings" on public.employee_meeting_attendees for delete to authenticated
   using (employee_id = auth.uid() or public.is_admin());
+
+-- Tracks whether each organizer/participant has seen the latest Meeting version.
+create table if not exists public.employee_meeting_views (
+  meeting_id uuid not null references public.employee_meetings(id) on delete cascade,
+  employee_id uuid not null references public.profiles(id) on delete cascade,
+  seen_at timestamptz not null default now(),
+  seen_meeting_updated_at timestamptz not null,
+  primary key (meeting_id, employee_id)
+);
+alter table public.employee_meeting_views enable row level security;
+drop policy if exists "users read own meeting views" on public.employee_meeting_views;
+drop policy if exists "users manage own meeting views" on public.employee_meeting_views;
+create policy "users read own meeting views" on public.employee_meeting_views for select to authenticated
+  using (employee_id = auth.uid() or public.is_admin());
+create policy "users manage own meeting views" on public.employee_meeting_views for all to authenticated
+  using (employee_id = auth.uid() or public.is_admin())
+  with check (employee_id = auth.uid() or public.is_admin());
 
 create or replace function public.validate_knt_employee_meeting_room_reservation()
 returns trigger language plpgsql set search_path = public as $$

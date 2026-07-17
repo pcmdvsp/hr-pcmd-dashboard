@@ -1,0 +1,13 @@
+id	email	employee_code	full_name	department_id	role	position	active	must_change_password
+c1f32994-8ea8-40e3-8a81-b5444f7c7056	haind.pt@vietsov.com.vn	16570	Nguy?n ??c H?i	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính Công ngh?	TRUE	TRUE
+cbb4ba59-5008-44b6-aa6c-393a32843ba5	dungnx.pt@vietsov.com.vn	17619	Nguy?n Xuân D?ng	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên Kinh t?	TRUE	TRUE
+0c6336c2-c328-44bd-bfed-0b456093db89	minhnb.dr@vietsov.com.vn	18333	Nguy?n Bình Minh	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính Khoan	TRUE	TRUE
+c86055de-df7f-4c20-8262-5d2e210dd2f2	oanhttk.rd@vietsov.com.vn	15840	T? Th? Kim Oanh	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính ??a ch?t - ?ông ngh? m? 	TRUE	TRUE
+7de8b987-0850-4040-9007-f0c59fbcaf62	manhnv.fg@vietsov.com.vn	20616	Nguy?n V?n M?nh	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	K? s? Thi?t k? - công ngh?	TRUE	TRUE
+a4109b95-317c-4b7a-9425-e91d9ae11b84	anhthp.hq@vietsov.com.vn	20089	Tr?nh Hoàng Ph??ng Anh	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính K? toán	TRUE	TRUE
+e0fb682b-5627-4b77-b448-5e35b88e0852	thanhpm.dr@vietsov.com.vn	19561	Ph?m M?ng Thành	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên C? khí	TRUE	TRUE
+d56a04a6-4ec3-4b9f-9bbd-41cc8ec6eade	quangdn.dr@vietsov.com.vn	17071	?? Ng?c Quang	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính v?t t?	TRUE	TRUE
+95364142-118a-46e5-922a-bd948d8f13e0	hangnk.hq@vietsov.com.vn	14560	Nguy?n Th? Kim H?ng	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên Th??ng m?i h?p ??ng	TRUE	TRUE
+7fe8adb1-e9a2-4be8-849d-476446dfde1a	 ivanovma.cd@vietsov.com.vn	17666	Ivanov Maxim	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Chuyên viên chính Thi?t k? - Công ngh?	TRUE	TRUE
+70ee5d8f-974b-4227-ac9e-8a2ba1f94afd	mikhailov.hq@vietsov.com.vn	21438	Mikhailov Vladimir	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Phó tr??ng Nhóm d? án	TRUE	TRUE
+ab8d3b93-a5e7-4d82-9a4c-7eb0072988b3	vinhpt.rd@vietsov.com.vn	17036	Ph?m Thành Vinh	9c3e7311-5c43-4591-b67f-26de319a8ae5	normal	Tr??ng Nhóm d? án	TRUE	TRUE

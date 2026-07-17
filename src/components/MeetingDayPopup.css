@@ -1,0 +1,15 @@
+.my-schedule + .modal-backdrop{z-index:30;background:rgba(22,40,58,.58);backdrop-filter:blur(3px)}
+.my-schedule + .modal-backdrop .modal{width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;background:#fff;border:1px solid #d8e3ee;border-radius:18px;box-shadow:0 24px 60px rgba(17,38,59,.35)}
+.my-schedule + .modal-backdrop .form-title{position:sticky;top:0;z-index:1;align-items:flex-start;padding:22px 22px 17px;background:#fff;border-bottom:1px solid #e5edf4}
+.my-schedule + .modal-backdrop .form-title h2{font-size:25px;line-height:1.15}
+.my-schedule + .modal-backdrop .form-title .close{width:34px;height:34px;background:#edf3f8;color:#274560}
+.my-schedule + .modal-backdrop .modal>section{margin:0!important;padding:18px 22px!important;border-top:0!important;border-bottom:1px solid #e7eef5!important}
+.my-schedule + .modal-backdrop .modal>section:last-child{border-bottom:0!important}
+.my-schedule + .modal-backdrop .modal>section strong{display:block;color:#1c3855;font-size:17px;line-height:1.35}
+.my-schedule + .modal-backdrop .modal>section .subtle{font-size:13px;line-height:1.55}
+.my-schedule + .modal-backdrop .modal>section .secondary-button{margin-top:4px;border-color:#2d70ae;background:#f6fbff;color:#225d95;font-weight:600}
+.my-schedule + .modal-backdrop .modal>section .secondary-button:hover{background:#e8f4ff}
+.my-schedule + .modal-backdrop .meeting-invitation{margin:0;color:#35536f;font-size:15px;font-weight:600;line-height:1.55}
+.my-schedule + .modal-backdrop .meeting-divider{margin:16px 0;border:0;border-top:1px solid #dce6ef}
+.my-schedule + .modal-backdrop .meeting-detail{margin:8px 0;color:#506780;font-size:14px;line-height:1.55}
+.my-schedule + .modal-backdrop .meeting-detail b{color:#213f5d}
