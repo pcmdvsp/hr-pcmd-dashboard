@@ -8,7 +8,7 @@ alter table public.daily_status add column if not exists end_time time;
 
 alter table public.daily_status drop constraint if exists daily_status_status_check;
 alter table public.daily_status add constraint daily_status_status_check
-  check (status in ('business_trip', 'leave', 'sick', 'meeting'));
+  check (status in ('working', 'business_trip', 'leave', 'sick', 'meeting'));
 
 alter table public.daily_status drop constraint if exists daily_status_meeting_time_check;
 alter table public.daily_status add constraint daily_status_meeting_time_check
@@ -85,6 +85,31 @@ alter table public.daily_status drop constraint if exists daily_status_status_ch
 alter table public.daily_status add constraint daily_status_status_check
   check (status in ('working', 'business_trip', 'leave', 'sick', 'meeting'));
 alter table public.employee_meetings add column if not exists is_overtime boolean not null default false;
+
+-- Notification reading is independent from opening the Meeting in My Status.
+alter table public.employee_meeting_views add column if not exists notification_meeting_updated_at timestamptz;
+
+-- Keeps a cancellation notice after the meeting and its attendee records are removed.
+create table if not exists public.employee_meeting_cancellations (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid not null references public.profiles(id) on delete cascade,
+  meeting_id uuid not null,
+  content text not null,
+  meeting_date date not null,
+  start_time time,
+  end_time time,
+  location text,
+  cancelled_at timestamptz not null default now(),
+  read_at timestamptz
+);
+create index if not exists employee_meeting_cancellations_employee_idx on public.employee_meeting_cancellations(employee_id, cancelled_at desc);
+alter table public.employee_meeting_cancellations enable row level security;
+drop policy if exists "users read own meeting cancellations" on public.employee_meeting_cancellations;
+drop policy if exists "organizers create meeting cancellations" on public.employee_meeting_cancellations;
+drop policy if exists "users mark own meeting cancellations read" on public.employee_meeting_cancellations;
+create policy "users read own meeting cancellations" on public.employee_meeting_cancellations for select to authenticated using (employee_id = auth.uid() or public.is_admin());
+create policy "organizers create meeting cancellations" on public.employee_meeting_cancellations for insert to authenticated with check (public.is_admin() or exists (select 1 from public.employee_meetings m where m.id = meeting_id and m.organizer_id = auth.uid()));
+create policy "users mark own meeting cancellations read" on public.employee_meeting_cancellations for update to authenticated using (employee_id = auth.uid() or public.is_admin()) with check (employee_id = auth.uid() or public.is_admin());
 
 create table if not exists public.employee_meeting_attendees (
   meeting_id uuid not null references public.employee_meetings(id) on delete cascade,

@@ -7,6 +7,7 @@ import SearchBox from '../components/SearchBox'
 import StatusForm from '../components/StatusForm'
 import StatusOverview from '../components/StatusOverview'
 import ResetPasswordDialog from '../components/ResetPasswordDialog'
+import MeetingNotifications from '../components/MeetingNotifications'
 import { formatDateTime } from '../utils/status'
 
 const formatHeaderDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(value)
@@ -42,7 +43,7 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
   return <main className="app-shell">
     <header className="topbar operations-header">
       <div><p className="eyebrow">PCMD - Vietsovpetro JV</p><h1>WORKING STATUS DASHBOARD</h1><p className="subtle">Last updated: {formatDateTime(latest)}</p></div>
-      <div className="header-actions-wrap"><div className="top-actions"><span className="user-chip">{profile.full_name}</span><button className="secondary-button" onClick={goUpdate}>My Status</button>{profile.role === 'admin' && <><button className="secondary-button" onClick={goAdmin}>Admin</button><button className="secondary-button" onClick={goCalendar}>Work calendar</button><button className="secondary-button reset-button" onClick={() => setResetPassword(true)}>Reset password</button></>}<button className="text-button" onClick={onSignOut}>Sign out</button></div><time className="header-clock">{formatHeaderDate(now)}<br/><b>{formatHeaderTime(now)}</b></time></div>
+      <div className="header-actions-wrap"><div className="top-actions"><span className="user-chip">{profile.full_name}</span><button className="secondary-button" onClick={goUpdate}>My Status</button>{profile.role === 'admin' && <><button className="secondary-button" onClick={goAdmin}>Admin</button><button className="secondary-button" onClick={goCalendar}>Work calendar</button><button className="secondary-button reset-button" onClick={() => setResetPassword(true)}>Reset password</button></>}<button className="text-button" onClick={onSignOut}>Sign out</button><MeetingNotifications employeeId={profile.id} onOpenMyStatus={goUpdate}/></div><time className="header-clock">{formatHeaderDate(now)}<br/><b>{formatHeaderTime(now)}</b></time></div>
     </header>
     <nav className="dashboard-navigation" aria-label="Dashboard pages"><button className="secondary-button" onClick={goMonthly}>Monthly statistics</button><button className="secondary-button" onClick={goMeeting}>Meeting Info</button></nav>
     <section className="toolbar"><SearchBox value={query} onChange={setQuery}/><label className="dashboard-date">Display date<input type="date" value={date} onChange={event => onDateChange(event.target.value)} /></label><StatusFilter value={filter} onChange={setFilter} departmentValue={departmentFilter} onDepartmentChange={setDepartmentFilter} departments={departments}/></section>

@@ -9,7 +9,7 @@ import './OvertimeConfirmDialog.css'
 const KNT_MEETING_ROOM = 'KNT meeting room'
 const ROOM_MESSAGE = 'The meeting room has been reserved for the selected time. Please choose different time!'
 const selectableStatuses = ['working', 'business_trip', 'leave', 'sick', 'meeting']
-const notePlaceholders = { leave: 'Reason for annual leave', sick: 'Reason for sick leave' }
+const notePlaceholders = { leave: 'Location', sick: 'Type of sickness' }
 const draftKey = employeeId => `my-status-draft:${employeeId}`
 const readDraft = employeeId => { try { return JSON.parse(sessionStorage.getItem(draftKey(employeeId)) || 'null') } catch { return null } }
 const datesInRange = (start, end) => {
@@ -30,8 +30,10 @@ export default function StatusForm({ employee, onSaved, onClose }) {
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
   const [employees, setEmployees] = useState([])
+  const [departments, setDepartments] = useState([])
   const [participantQuery, setParticipantQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
+  const [selectedDepartment, setSelectedDepartment] = useState(null)
   const [unavailable, setUnavailable] = useState(new Map())
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -59,6 +61,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     setEndTime(draft?.endTime || employee.daily?.end_time?.slice(0, 5) || '')
     setParticipantQuery(draft?.participantQuery || '')
     setSelectedIds(draft?.selectedIds || (employee.id ? [employee.id] : []))
+    setSelectedDepartment(null)
     setConfirmOvertime(false)
     setOvertimeApproved(false)
     setOvertimeDates([])
@@ -72,8 +75,12 @@ export default function StatusForm({ employee, onSaved, onClose }) {
   useEffect(() => { if (!onClose && saved) sessionStorage.removeItem(draftKey(employee.id)) }, [employee.id, onClose, saved])
   useEffect(() => {
     if (status !== 'meeting') return
-    supabase.from('profiles').select('id,full_name,employee_code').eq('active', true).order('full_name').then(({ data, error: resultError }) => {
-      if (resultError) setError(resultError.message); else setEmployees(data || [])
+    Promise.all([
+      supabase.from('profiles').select('id,full_name,employee_code,department_id').eq('active', true).order('full_name'),
+      supabase.from('departments').select('id,name,sort_order').order('sort_order'),
+    ]).then(([employeeResult, departmentResult]) => {
+      if (employeeResult.error || departmentResult.error) setError(employeeResult.error?.message || departmentResult.error?.message)
+      else { setEmployees(employeeResult.data || []); setDepartments(departmentResult.data || []) }
     })
   }, [status])
   useEffect(() => {
@@ -88,11 +95,23 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     const query = participantQuery.trim().toLowerCase()
     return query ? employees.filter(item => item.id !== employee.id && `${item.full_name} ${item.employee_code}`.toLowerCase().includes(query)) : []
   }, [employees, participantQuery, employee.id])
+  const filteredDepartments = useMemo(() => {
+    const query = participantQuery.trim().toLowerCase()
+    return query ? departments.filter(department => department.name.toLowerCase().includes(query)) : []
+  }, [departments, participantQuery])
   const organizerUnavailableReason = unavailable.get(employee.id)
   const markChanged = () => { setSaved(false); setOvertimeApproved(false); setOvertimeDates([]) }
   const toggleParticipant = id => {
     if (unavailable.has(id)) return
     setSelectedIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id])
+    markChanged()
+  }
+  const addDepartmentParticipants = departmentId => {
+    const department = departments.find(item => item.id === departmentId)
+    const members = employees.filter(item => item.department_id === departmentId && !unavailable.has(item.id))
+    setSelectedIds(ids => [...new Set([...ids, ...members.map(member => member.id)])])
+    setSelectedDepartment(department || null)
+    setParticipantQuery('')
     markChanged()
   }
 
@@ -171,9 +190,14 @@ export default function StatusForm({ employee, onSaved, onClose }) {
           {selectedIds.includes(employee.id) ? '✓ ' : ''}{employee.full_name} <span className="employee-code">{organizerUnavailableReason ? `Unavailable: ${organizerUnavailableReason}` : 'Meeting organizer'}</span>
         </button>
       </div>
+      {selectedDepartment && <div className="employee-list" aria-label={`${selectedDepartment.name} members`}>
+        <p className="subtle">{selectedDepartment.name}</p>
+        {employees.filter(item => item.department_id === selectedDepartment.id).map(item => { const reason = unavailable.get(item.id); return <button type="button" key={item.id} disabled={Boolean(reason)} className={`employee-badge is-editable ${selectedIds.includes(item.id) ? 'is-selected' : ''}`} style={reason ? { opacity: .55, cursor: 'not-allowed' } : undefined} onClick={() => toggleParticipant(item.id)}>{selectedIds.includes(item.id) ? '✓ ' : ''}{item.full_name} <span className="employee-code">{reason ? `Unavailable: ${reason}` : item.employee_code}</span></button> })}
+      </div>}
       {participantQuery.trim() && <div className="employee-list" aria-label="Meeting participant search results">
+        {filteredDepartments.map(department => <button type="button" key={department.id} className="employee-badge is-editable" onClick={() => addDepartmentParticipants(department.id)}>{department.name} <span className="employee-code">Add available members</span></button>)}
         {filteredEmployees.map(item => { const reason = unavailable.get(item.id); return <button type="button" key={item.id} disabled={Boolean(reason)} className={`employee-badge is-editable ${selectedIds.includes(item.id) ? 'is-selected' : ''}`} style={reason ? { opacity: .55, cursor: 'not-allowed' } : undefined} onClick={() => toggleParticipant(item.id)}>{selectedIds.includes(item.id) ? '✓ ' : ''}{item.full_name} <span className="employee-code">{reason ? `Unavailable: ${reason}` : item.employee_code}</span></button> })}
-        {filteredEmployees.length === 0 && <p className="empty">No matching employees</p>}
+        {filteredEmployees.length === 0 && filteredDepartments.length === 0 && <p className="empty">No matching employees or departments</p>}
       </div>}
     </>}
     {needsDetails ? <>
@@ -182,7 +206,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
         <label><span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Location <span><input type="checkbox" checked={location === KNT_MEETING_ROOM} onChange={event => { setLocation(event.target.checked ? KNT_MEETING_ROOM : ''); markChanged() }} /> {KNT_MEETING_ROOM}</span></span><input required value={location} onChange={event => { setLocation(event.target.value); markChanged() }} /></label>
         <label>Online Link <span className="subtle">(optional)</span><input type="url" value={onlineLink} onChange={event => { setOnlineLink(event.target.value); markChanged() }} placeholder="https://..." /></label>
       </> : <label>Location<input required value={location} onChange={event => { setLocation(event.target.value); markChanged() }} /></label>}
-    </> : status !== 'working' && <label>Note<textarea value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}
+    </> : status !== 'working' && <label>{status === 'leave' ? 'Location' : 'Note'}<textarea value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}
     {error && <p className="form-error">{error}</p>}
     {confirmOvertime && <div className="overtime-confirm-backdrop"><section className="overtime-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="overtime-confirm-title"><p className="eyebrow">OVERTIME CONFIRMATION</p><h2 id="overtime-confirm-title">Please confirm your overtime working on selected weekend?</h2><div className="overtime-confirm-actions"><button type="button" className="secondary-button" onClick={() => { setConfirmOvertime(false); setOvertimeDates([]) }}>No</button><button type="button" className="primary-button" onClick={() => { setConfirmOvertime(false); setOvertimeApproved(true); window.setTimeout(() => formRef.current?.requestSubmit(), 0) }}>Yes</button></div></section></div>}
     <button className="primary-button" disabled={saving}>{saving ? 'Saving...' : saved ? 'Saved' : 'Save status'}</button>

@@ -36,7 +36,7 @@ export default function MyScheduleOverview({ employeeId }) {
       supabase.from('employee_meeting_attendees').select('meeting_id').eq('employee_id', employeeId),
       supabase.from('work_calendar').select('date,day_type,holiday_name').gte('date', start).lt('date', endKey),
       supabase.from('profiles').select('id,full_name,email').eq('active', true),
-      supabase.from('employee_meeting_views').select('meeting_id,seen_at,seen_meeting_updated_at').eq('employee_id', employeeId),
+      supabase.from('employee_meeting_views').select('meeting_id,seen_at,seen_meeting_updated_at,notification_meeting_updated_at').eq('employee_id', employeeId),
     ]).then(([statusResult, meetingResult, attendeeResult, calendarResult, profileResult, viewResult]) => {
       const attendedIds = new Set((attendeeResult.data || []).map(item => item.meeting_id))
       const organizerById = new Map((profileResult.data || []).map(person => [person.id, person.full_name || person.email]))
@@ -53,14 +53,14 @@ export default function MyScheduleOverview({ employeeId }) {
   const calendarByDate = useMemo(() => new Map(calendar.map(day => [day.date, day])), [calendar])
   const viewByMeeting = useMemo(() => new Map(views.map(view => [view.meeting_id, view])), [views])
   const meetingBadge = dayMeetings => {
-    const states = dayMeetings.map(meeting => { const view = viewByMeeting.get(meeting.id); return !view ? 'New' : new Date(meeting.updated_at) > new Date(view.seen_meeting_updated_at) ? 'Updated' : null })
+    const states = dayMeetings.map(meeting => { const view = viewByMeeting.get(meeting.id); const wasOpenedInSchedule = view?.seen_meeting_updated_at && new Date(view.seen_meeting_updated_at).getTime() > 0; return !wasOpenedInSchedule ? 'New' : new Date(meeting.updated_at) > new Date(view.seen_meeting_updated_at) ? 'Updated' : null })
     return states.includes('New') ? 'New' : states.includes('Updated') ? 'Updated' : null
   }
   const openMeetingDay = async dayMeetings => {
     if (!dayMeetings.length) return
     setSelectedMeetings(dayMeetings)
     const seenAt = new Date().toISOString()
-    const payload = dayMeetings.map(meeting => ({ meeting_id: meeting.id, employee_id: employeeId, seen_at: seenAt, seen_meeting_updated_at: meeting.updated_at }))
+    const payload = dayMeetings.map(meeting => ({ meeting_id: meeting.id, employee_id: employeeId, seen_at: seenAt, seen_meeting_updated_at: meeting.updated_at, notification_meeting_updated_at: meeting.updated_at }))
     const result = await supabase.from('employee_meeting_views').upsert(payload, { onConflict: 'meeting_id,employee_id' })
     if (!result.error) setViews(current => [...current.filter(view => !payload.some(item => item.meeting_id === view.meeting_id)), ...payload])
   }

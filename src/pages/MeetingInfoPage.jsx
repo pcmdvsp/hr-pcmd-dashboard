@@ -2,6 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { formatDate, today } from '../utils/status'
 import { showRoomReservationAlert } from '../components/RoomReservationAlert'
+import { getUnavailableMeetingParticipants } from '../utils/meetingAvailability'
+import './MeetingInfoPage.css'
 
 const KNT_MEETING_ROOM = 'KNT meeting room'
 const ROOM_MESSAGE = 'The meeting room has been reserved for the selected time. Please choose different time!'
@@ -25,6 +27,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [editing, setEditing] = useState(null)
+  const [actionMeeting, setActionMeeting] = useState(null)
+  const [cancellingMeeting, setCancellingMeeting] = useState(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -77,6 +81,23 @@ export default function MeetingInfoPage({ profile, goBack }) {
 
   const canEdit = meeting => meeting.organizer_id === profile.id || profile.role === 'admin'
   const selectedAttendeeIds = editing ? attendees.filter(attendee => attendee.meeting_id === editing.id).map(attendee => attendee.employee_id) : []
+  const cancelMeeting = async meeting => {
+    setActionMeeting(null)
+    setCancellingMeeting(null)
+    setError('')
+    const attendeeLookup = await supabase.from('employee_meeting_attendees').select('employee_id').eq('meeting_id', meeting.id)
+    if (attendeeLookup.error) return setError(attendeeLookup.error.message)
+    const cancellationRows = (attendeeLookup.data || []).map(attendee => ({ employee_id: attendee.employee_id, meeting_id: meeting.id, content: meeting.content || 'Meeting', meeting_date: meeting.date, start_time: meeting.start_time, end_time: meeting.end_time, location: meeting.location }))
+    if (cancellationRows.length) {
+      const notificationResult = await supabase.from('employee_meeting_cancellations').insert(cancellationRows)
+      if (notificationResult.error) return setError(notificationResult.error.message)
+    }
+    const attendeesResult = await supabase.from('employee_meeting_attendees').delete().eq('meeting_id', meeting.id)
+    if (attendeesResult.error) return setError(attendeesResult.error.message)
+    const meetingResult = await supabase.from('employee_meetings').delete().eq('id', meeting.id)
+    if (meetingResult.error) return setError(meetingResult.error.message)
+    load()
+  }
 
   return <main className="app-shell meeting-page">
     <header className="topbar">
@@ -100,7 +121,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
             <td>{timeRange(meeting)}</td>
             <td>{meeting.location || '—'}</td>
             <td>{meeting.participants.map(person => person.full_name).join(', ') || '—'}</td>
-            <td>{canEdit(meeting) ? <button className="secondary-button" onClick={() => setEditing(meeting)}>Edit</button> : '—'}</td>
+            <td>{canEdit(meeting) ? <button className="secondary-button" onClick={() => setActionMeeting(meeting)}>Edit</button> : '—'}</td>
             <td>{meeting.online_link ? <a href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a> : '—'}</td>
           </tr>)}
         </Fragment>)}</tbody>
@@ -110,6 +131,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
     {editing && <div className="modal-backdrop"><div className="modal">
       <MeetingEditor meeting={editing} employees={employees} attendeeIds={selectedAttendeeIds} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
     </div></div>}
+    {actionMeeting && <div className="modal-backdrop"><section className="meeting-action-dialog" role="dialog" aria-modal="true"><button type="button" className="close" onClick={() => setActionMeeting(null)} aria-label="Close">×</button><p className="eyebrow">MEETING ACTIONS</p><h2>{actionMeeting.content || 'Meeting'}</h2><p>Choose an action for this meeting.</p><div><button type="button" className="secondary-button" onClick={() => { setActionMeeting(null); setEditing(actionMeeting) }}>Update meeting</button><button type="button" className="secondary-button cancel-action" onClick={() => { setActionMeeting(null); setCancellingMeeting(actionMeeting) }}>Cancel meeting</button></div></section></div>}
+    {cancellingMeeting && <div className="modal-backdrop"><section className="meeting-action-dialog meeting-cancel-confirm" role="alertdialog" aria-modal="true"><p className="eyebrow">CONFIRM CANCELLATION</p><h2>Cancel this meeting?</h2><p>All assigned participants will be removed and receive a cancellation notification.</p><div><button type="button" className="secondary-button" onClick={() => setCancellingMeeting(null)}>Keep meeting</button><button type="button" className="secondary-button cancel-action" onClick={() => cancelMeeting(cancellingMeeting)}>Cancel meeting</button></div></section></div>}
   </main>
 }
 
@@ -121,16 +144,18 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
   const [endTime, setEndTime] = useState(meeting.end_time?.slice(0, 5) || '')
   const [selectedIds, setSelectedIds] = useState(attendeeIds)
   const [query, setQuery] = useState('')
+  const [unavailable, setUnavailable] = useState(new Map())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => { if (error === ROOM_MESSAGE) showRoomReservationAlert(ROOM_MESSAGE) }, [error])
+  useEffect(() => { getUnavailableMeetingParticipants([meeting.date]).then(nextUnavailable => { setUnavailable(nextUnavailable); setSelectedIds(ids => ids.filter(id => !nextUnavailable.has(id))) }) }, [meeting.date])
   const results = useMemo(() => {
     const text = query.trim().toLowerCase()
     return text ? employees.filter(employee => `${employee.full_name} ${employee.employee_code}`.toLowerCase().includes(text)) : []
   }, [employees, query])
   const selectedEmployees = useMemo(() => employees.filter(employee => selectedIds.includes(employee.id)), [employees, selectedIds])
-  const toggleParticipant = id => setSelectedIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id])
+  const toggleParticipant = id => { if (!unavailable.has(id)) setSelectedIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id]) }
 
   const submit = async event => {
     event.preventDefault()
@@ -139,6 +164,9 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
     if (endTime < startTime) return setError('The end time must not be earlier than the start time.')
     setSaving(true)
     setError('')
+    const currentUnavailable = await getUnavailableMeetingParticipants([meeting.date])
+    const invalidSelected = selectedIds.find(id => currentUnavailable.has(id))
+    if (invalidSelected) { setSaving(false); return setError(`This participant is unavailable: ${currentUnavailable.get(invalidSelected)}.`) }
     if (location.trim() === KNT_MEETING_ROOM) {
       const reservation = await supabase.from('employee_meetings').select('id').eq('date', meeting.date).eq('location', KNT_MEETING_ROOM).neq('id', meeting.id).lt('start_time', endTime).gt('end_time', startTime).limit(1)
       if (reservation.error) { setSaving(false); return setError(reservation.error.message) }
@@ -169,15 +197,15 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
     <label>Online Link <span className="subtle">(optional)</span><input type="url" value={onlineLink} onChange={event => setOnlineLink(event.target.value)} placeholder="https://..." /></label>
     <p className="subtle">Selected participants</p>
     <div className="employee-list" aria-label="Selected meeting participants">
-      {selectedEmployees.map(employee => <button type="button" key={employee.id} className="employee-badge is-editable is-selected" onClick={() => toggleParticipant(employee.id)}>✓ {employee.full_name} <span className="employee-code">{employee.employee_code}</span></button>)}
+      {selectedEmployees.map(employee => { const reason = unavailable.get(employee.id); return <button type="button" key={employee.id} disabled={Boolean(reason)} className="employee-badge is-editable is-selected" style={reason ? { opacity: .55, cursor: 'not-allowed' } : undefined} onClick={() => toggleParticipant(employee.id)}>✓ {employee.full_name} <span className="employee-code">{reason ? `Unavailable: ${reason}` : employee.employee_code}</span></button> })}
       {selectedEmployees.length === 0 && <p className="empty">No participants selected</p>}
     </div>
     <label>Search participants<input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search by name or employee ID" /></label>
     {query.trim() && <div className="employee-list" aria-label="Meeting participant search results">
-      {results.map(employee => <button type="button" key={employee.id} className={`employee-badge is-editable ${selectedIds.includes(employee.id) ? 'is-selected' : ''}`} onClick={() => toggleParticipant(employee.id)}>{selectedIds.includes(employee.id) ? '✓ ' : ''}{employee.full_name} <span className="employee-code">{employee.employee_code}</span></button>)}
+      {results.map(employee => { const reason = unavailable.get(employee.id); return <button type="button" key={employee.id} disabled={Boolean(reason)} className={`employee-badge is-editable ${selectedIds.includes(employee.id) ? 'is-selected' : ''}`} style={reason ? { opacity: .55, cursor: 'not-allowed' } : undefined} onClick={() => toggleParticipant(employee.id)}>{selectedIds.includes(employee.id) ? '✓ ' : ''}{employee.full_name} <span className="employee-code">{reason ? `Unavailable: ${reason}` : employee.employee_code}</span></button> })}
       {results.length === 0 && <p className="empty">No matching employees</p>}
     </div>}
     {error && <p className="form-error">{error}</p>}
-    <button className="primary-button" disabled={saving}>{saving ? 'Saving...' : 'Save meeting'}</button>
+    <button className="primary-button" disabled={saving}>{saving ? 'Saving...' : 'Update'}</button>
   </form>
 }
