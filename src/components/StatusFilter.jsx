@@ -12,6 +12,8 @@ export default function StatusFilter({ value, onChange, departmentValue, onDepar
       <option value="leadership">Leadership</option>
       {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
     </select>
-    {statusFilters.map(([key, item]) => <button key={key} className={value === key ? 'active' : ''} onClick={() => onChange(key)}>{item.label}</button>)}
+    <div className="status-filter-options" aria-label="Filter by status">
+      {statusFilters.map(([key, item]) => <button key={key} className={value === key ? 'active' : ''} onClick={() => onChange(key)}>{item.label}</button>)}
+    </div>
   </div>
 }

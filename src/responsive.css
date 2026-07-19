@@ -1,0 +1,20 @@
+@media (max-width: 640px) {
+  .app-shell { padding: 20px 12px 40px; }
+
+  .auth-layout { padding: 12px; }
+  .auth-card { padding: 18px; }
+  .update-card { width: 100%; }
+
+  .topbar { gap: 16px; margin-bottom: 20px; }
+  .top-actions { flex-wrap: wrap; }
+  .date-range { grid-template-columns: 1fr !important; }
+
+  .status-overview { flex-direction: column; align-items: stretch; gap: 16px; padding: 20px 16px; }
+  .status-pie-wrapper { align-self: center; }
+  .global-legend-items { gap: 7px; }
+  .global-legend-items span { padding: 8px 9px; font-size: 12px; }
+
+  .monthly-controls { overflow-x: auto; padding-bottom: 4px; }
+  .monthly-controls > * { flex: 0 0 auto; }
+  .monthly-table-wrap { overflow-x: auto; }
+}

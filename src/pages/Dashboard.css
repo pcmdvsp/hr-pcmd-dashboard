@@ -207,4 +207,16 @@
 @media (max-width: 640px) {
   .dashboard-navigation { overflow-x: auto; }
   .dashboard-navigation .secondary-button { flex: 0 0 auto; }
+
+  .operations-header { padding: 16px; }
+  .operations-header h1 { font-size: 21px; }
+  .header-actions-wrap { width: 100%; align-items: stretch; }
+  .top-actions { width: 100%; gap: 7px; }
+  .top-actions .user-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  .header-clock { align-self: flex-end; }
+  .toolbar { align-items: stretch; margin: 20px 0; }
+  .toolbar .search-box { width: 100%; flex: 1 1 auto; }
+  .toolbar .dashboard-date { width: 100%; }
+  .toolbar .dashboard-date input { width: 100%; }
+  .toolbar .status-filter { width: 100%; }
 }

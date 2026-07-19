@@ -9,9 +9,19 @@
 }
 
 .status-filter {
-  flex-wrap: nowrap;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+.status-filter-options {
+  display: flex;
+  min-width: 0;
+  gap: 6px;
   overflow-x: auto;
-  padding-bottom: 2px;
+  padding: 2px 0;
+  scrollbar-width: thin;
 }
 
 .status-filter button {
@@ -26,4 +36,10 @@
   background: #e2ebf5;
   border-color: #b7cce0;
   color: #1e466e;
+}
+
+@media (max-width: 640px) {
+  .status-filter { width: 100%; flex-direction: column; align-items: stretch; }
+  .department-filter, .status-filter-options { width: 100%; }
+  .status-filter button { padding: 8px 10px; font-size: 12px; }
 }
