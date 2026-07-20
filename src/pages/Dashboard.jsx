@@ -50,12 +50,12 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
     {error && <p className="notice error">{error}</p>}
     {loading ? <p className="loading">Loading data...</p> : !isWorkingDay ? <>
       <section className="dashboard-empty non-working-dashboard"><span>◌</span><h2>{nonWorkingMessage}</h2></section>
-      {nonWorkingLeaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Leadership' }} employees={nonWorkingLeaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit} nonWorking/></div></section>}
+      {nonWorkingLeaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={nonWorkingLeaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit} nonWorking/></div></section>}
       <section className="department-grid">{nonWorkingDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} editable={profile.role === 'admin'} onEmployeeClick={setEdit} nonWorking/>)}</section>
       {nonWorkingEmployees.length === 0 && <p className="empty">No employees are working or on business trips.</p>}
     </> : <>
       <StatusOverview employees={dashboardEmployees}/>
-      {leaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Leadership' }} employees={leaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/></div></section>}
+      {leaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={leaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/></div></section>}
       <section className="department-grid">{visibleDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/>)}</section>
       {visible.length === 0 && <div className="dashboard-empty"><span>◌</span><p>No matching employees found.</p></div>}
     </>}

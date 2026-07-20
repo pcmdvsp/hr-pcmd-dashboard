@@ -5,7 +5,7 @@ import { today } from '../utils/status'
 
 const currentMonth = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit' }).format(new Date()).slice(0, 7)
 const moveMonth = (month, delta) => { const date = new Date(`${month}-01T12:00:00`); date.setMonth(date.getMonth() + delta); return date.toISOString().slice(0, 7) }
-const departmentLabel = name => name === 'Ban lãnh đạo' ? 'Leadership' : name
+const departmentLabel = name => name === 'Ban lãnh đạo' ? 'Management Board' : name
 const cutOffDate = () => new Intl.DateTimeFormat('en-GB').format(new Date(`${today()}T00:00:00`))
 
 export default function MonthlyStatsPage({ goBack }) {

@@ -9,7 +9,7 @@ export default function StatusFilter({ value, onChange, departmentValue, onDepar
   return <div className="status-filter">
     <select className="department-filter" value={departmentValue} onChange={event => onDepartmentChange(event.target.value)} aria-label="Filter by department">
       <option value="all">All departments</option>
-      <option value="leadership">Leadership</option>
+      <option value="leadership">Management Board</option>
       {departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}
     </select>
     <div className="status-filter-options" aria-label="Filter by status">
