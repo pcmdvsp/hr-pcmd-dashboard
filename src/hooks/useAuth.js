@@ -10,6 +10,7 @@ export function useAuth() {
     const load = async (currentSession) => {
       setSession(currentSession)
       if (!currentSession) return setProfile(null)
+      setProfile(undefined)
       const { data } = await supabase.from('profiles').select('*, departments(id,name,sort_order)').eq('id', currentSession.user.id).single()
       setProfile(data ?? null)
     }

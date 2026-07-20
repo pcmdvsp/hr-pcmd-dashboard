@@ -126,6 +126,10 @@
   flex: 0 1 260px;
 }
 
+.toolbar .search-box input {
+  font-size: 12px;
+}
+
 .toolbar .status-filter {
   gap: 5px;
 }

@@ -144,6 +144,32 @@ drop policy if exists "participants leave employee meetings" on public.employee_
 create policy "participants leave employee meetings" on public.employee_meeting_attendees for delete to authenticated
   using (employee_id = auth.uid() or public.is_admin());
 
+-- Database-level protection: an employee on business trip, annual leave, or
+-- sick leave can organize a meeting but cannot be inserted as its attendee.
+-- This protects their existing daily_status even if a stale browser submits an
+-- outdated participant selection.
+create or replace function public.validate_employee_meeting_attendee_availability()
+returns trigger language plpgsql set search_path = public as $$
+declare
+  meeting_date date;
+begin
+  select date into meeting_date from public.employee_meetings where id = new.meeting_id;
+  if exists (
+    select 1 from public.daily_status s
+    where s.employee_id = new.employee_id
+      and s.date = meeting_date
+      and s.status in ('business_trip', 'leave', 'sick')
+  ) then
+    raise exception 'This participant is unavailable on the meeting date.';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists employee_meeting_attendee_availability_check on public.employee_meeting_attendees;
+create trigger employee_meeting_attendee_availability_check
+before insert or update of meeting_id, employee_id on public.employee_meeting_attendees
+for each row execute function public.validate_employee_meeting_attendee_availability();
+
 -- Tracks whether each organizer/participant has seen the latest Meeting version.
 create table if not exists public.employee_meeting_views (
   meeting_id uuid not null references public.employee_meetings(id) on delete cascade,

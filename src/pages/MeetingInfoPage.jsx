@@ -67,13 +67,16 @@ export default function MeetingInfoPage({ profile, goBack }) {
         .filter(attendee => attendee.meeting_id === meeting.id)
         .map(attendee => employeeById.get(attendee.employee_id))
         .filter(Boolean)
-      const involvedPeople = [organizer, ...participantPeople].filter(Boolean)
-      const departmentIds = [...new Set(involvedPeople.map(person => person.department_id || 'leadership'))]
+      // A department appears only when it has an actual attendee. The organizer
+      // alone must not create an empty department row.
+      const departmentIds = [...new Set(participantPeople.map(person => person.department_id || 'leadership'))]
       departmentIds.forEach(departmentId => {
         const department = departmentById.get(departmentId)
         if (!groups.has(departmentId)) groups.set(departmentId, { name: department?.name || 'Leadership', sortOrder: department?.sort_order ?? -1, items: [] })
         const participantsInDepartment = participantPeople.filter(person => (person.department_id || 'leadership') === departmentId)
-        groups.get(departmentId).items.push({ ...meeting, participants: participantsInDepartment.length ? participantsInDepartment : [organizer].filter(Boolean) })
+        // The organizer is only the person who created the meeting. Do not
+        // show them as a participant unless they were explicitly selected.
+        groups.get(departmentId).items.push({ ...meeting, participants: participantsInDepartment })
       })
     })
     return [...groups.values()].sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name))
@@ -126,7 +129,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
           </tr>)}
         </Fragment>)}</tbody>
       </table>
-      {meetings.length === 0 && <p className="empty">No meetings scheduled for this day.</p>}
+      {groupedMeetings.length === 0 && <p className="empty">No meetings with participants scheduled for this day.</p>}
     </div>}
     {editing && <div className="modal-backdrop"><div className="modal">
       <MeetingEditor meeting={editing} employees={employees} attendeeIds={selectedAttendeeIds} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); load() }} />
@@ -165,8 +168,7 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
     setSaving(true)
     setError('')
     const currentUnavailable = await getUnavailableMeetingParticipants([meeting.date])
-    const invalidSelected = selectedIds.find(id => currentUnavailable.has(id))
-    if (invalidSelected) { setSaving(false); return setError(`This participant is unavailable: ${currentUnavailable.get(invalidSelected)}.`) }
+    const availableSelectedIds = [...new Set(selectedIds.filter(id => !currentUnavailable.has(id)))]
     if (location.trim() === KNT_MEETING_ROOM) {
       const reservation = await supabase.from('employee_meetings').select('id').eq('date', meeting.date).eq('location', KNT_MEETING_ROOM).neq('id', meeting.id).lt('start_time', endTime).gt('end_time', startTime).limit(1)
       if (reservation.error) { setSaving(false); return setError(reservation.error.message) }
@@ -178,8 +180,8 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
     if (update.error) { setSaving(false); return setError(update.error.message) }
     const remove = await supabase.from('employee_meeting_attendees').delete().eq('meeting_id', meeting.id)
     if (remove.error) { setSaving(false); return setError(remove.error.message) }
-    if (selectedIds.length) {
-      const insert = await supabase.from('employee_meeting_attendees').insert(selectedIds.map(employeeId => ({ meeting_id: meeting.id, employee_id: employeeId })))
+    if (availableSelectedIds.length) {
+      const insert = await supabase.from('employee_meeting_attendees').insert(availableSelectedIds.map(employeeId => ({ meeting_id: meeting.id, employee_id: employeeId })))
       if (insert.error) { setSaving(false); return setError(insert.error.message) }
     }
     setSaving(false)

@@ -365,10 +365,13 @@ h2 {
   place-items: center;
   background: #2e6fae;
   color: #fff;
-  width: 42px;
-  height: 42px;
+  width: fit-content;
+  min-height: 42px;
+  padding: 0 14px;
   border-radius: 12px;
   font-weight: 700;
+  font-size: 12px;
+  white-space: nowrap;
   margin-bottom: 22px;
 }
 .admin-panel {

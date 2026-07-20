@@ -119,6 +119,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     event.preventDefault()
     if (endDate < startDate) return setError('The end date must not be earlier than the start date.')
     if (needsDetails && (!content.trim() || !location.trim())) return setError('Content and location are required.')
+    if (status === 'leave' && !note.trim()) return setError('Location is required for annual leave.')
     if (status === 'meeting' && (!startTime || !endTime)) return setError('Start time and end time are required for a meeting.')
     if (status === 'meeting' && endTime < startTime) return setError('The end time must not be earlier than the start time.')
     if ((status === 'working' || status === 'meeting') && !overtimeApproved) {
@@ -134,8 +135,9 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     setSaving(true); setError('')
     if (status === 'meeting') {
       const currentUnavailable = await getUnavailableMeetingParticipants(dates)
-      const invalidSelected = selectedIds.find(id => currentUnavailable.has(id))
-      if (invalidSelected) { setSaving(false); return setError(`This participant is unavailable: ${currentUnavailable.get(invalidSelected)}.`) }
+      // An unavailable organizer may still create a meeting, but neither the
+      // organizer nor any unavailable employee can become an attendee.
+      const availableSelectedIds = [...new Set(selectedIds.filter(id => !currentUnavailable.has(id)))]
       if (location.trim() === KNT_MEETING_ROOM) {
         const reservation = await supabase.from('employee_meetings').select('id').in('date', dates).eq('location', KNT_MEETING_ROOM).lt('start_time', endTime).gt('end_time', startTime).limit(1)
         if (reservation.error) { setSaving(false); return setError(reservation.error.message) }
@@ -144,8 +146,8 @@ export default function StatusForm({ employee, onSaved, onClose }) {
       const meetingResult = await supabase.from('employee_meetings').insert(dates.map(date => ({ organizer_id: employee.id, date, content: content.trim(), location: location.trim(), online_link: onlineLink.trim() || null, start_time: startTime, end_time: endTime, is_overtime: overtimeDates.includes(date) }))).select('id')
       if (meetingResult.error) { setSaving(false); return setError(meetingResult.error.message) }
       const meetingIds = (meetingResult.data || []).map(meeting => meeting.id)
-      if (meetingIds.length && selectedIds.length) {
-        const attendeeResult = await supabase.from('employee_meeting_attendees').insert(meetingIds.flatMap(meetingId => selectedIds.map(employeeId => ({ meeting_id: meetingId, employee_id: employeeId }))))
+      if (meetingIds.length && availableSelectedIds.length) {
+        const attendeeResult = await supabase.from('employee_meeting_attendees').insert(meetingIds.flatMap(meetingId => availableSelectedIds.map(employeeId => ({ meeting_id: meetingId, employee_id: employeeId }))))
         if (attendeeResult.error) { setSaving(false); return setError(attendeeResult.error.message) }
       }
     } else {
@@ -206,7 +208,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
         <label><span style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>Location <span><input type="checkbox" checked={location === KNT_MEETING_ROOM} onChange={event => { setLocation(event.target.checked ? KNT_MEETING_ROOM : ''); markChanged() }} /> {KNT_MEETING_ROOM}</span></span><input required value={location} onChange={event => { setLocation(event.target.value); markChanged() }} /></label>
         <label>Online Link <span className="subtle">(optional)</span><input type="url" value={onlineLink} onChange={event => { setOnlineLink(event.target.value); markChanged() }} placeholder="https://..." /></label>
       </> : <label>Location<input required value={location} onChange={event => { setLocation(event.target.value); markChanged() }} /></label>}
-    </> : status !== 'working' && <label>{status === 'leave' ? 'Location' : 'Note'}<textarea value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}
+    </> : status !== 'working' && <label>{status === 'leave' ? 'Location' : 'Note'}<textarea required={status === 'leave'} value={note} onChange={event => { setNote(event.target.value); markChanged() }} placeholder={notePlaceholders[status]} rows="3" /></label>}
     {error && <p className="form-error">{error}</p>}
     {confirmOvertime && <div className="overtime-confirm-backdrop"><section className="overtime-confirm-dialog" role="alertdialog" aria-modal="true" aria-labelledby="overtime-confirm-title"><p className="eyebrow">OVERTIME CONFIRMATION</p><h2 id="overtime-confirm-title">Please confirm your overtime working on selected weekend?</h2><div className="overtime-confirm-actions"><button type="button" className="secondary-button" onClick={() => { setConfirmOvertime(false); setOvertimeDates([]) }}>No</button><button type="button" className="primary-button" onClick={() => { setConfirmOvertime(false); setOvertimeApproved(true); window.setTimeout(() => formRef.current?.requestSubmit(), 0) }}>Yes</button></div></section></div>}
     <button className="primary-button" disabled={saving}>{saving ? 'Saving...' : saved ? 'Saved' : 'Save status'}</button>
