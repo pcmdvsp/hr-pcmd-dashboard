@@ -34,7 +34,7 @@ function App() {
   if (page === 'update') return <UpdateStatusPage profile={profile} goBack={returnToDashboard} />
   if (page === 'meeting') return <MeetingInfoPage profile={profile} goBack={returnToDashboard} />
   if (page === 'calendar' && profile.role === 'admin') return <WorkCalendarPage goBack={returnToDashboard} />
-  return page === 'admin' && profile.role === 'admin' ? <AdminPage data={data} goBack={returnToDashboard}/> : <Dashboard profile={profile} data={data} onSignOut={signout} goAdmin={() => setPage('admin')} goMonthly={() => setPage('monthly')} goMeeting={() => setPage('meeting')} goUpdate={() => setPage('update')} goCalendar={() => setPage('calendar')} onDateChange={date => navigate(`/?date=${date}`)}/>
+  return page === 'admin' && profile.role === 'admin' ? <AdminPage data={data} goBack={returnToDashboard}/> : <Dashboard profile={profile} data={data} onSignOut={signout} goAdmin={() => setPage('admin')} goMonthly={() => setPage('monthly')} goMeeting={() => setPage('meeting')} goProduction={() => window.open('https://nymphetamineanh.github.io/psc-dashboard-v2/', '_blank', 'noopener,noreferrer')} goUpdate={() => setPage('update')} goCalendar={() => setPage('calendar')} onDateChange={date => navigate(`/?date=${date}`)}/>
 }
 
 createRoot(document.getElementById('root')).render(<StrictMode><RoomReservationAlert/><SuccessAlert/><HashRouter><App/></HashRouter></StrictMode>)

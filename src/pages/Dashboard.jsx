@@ -14,7 +14,7 @@ const formatHeaderDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-dig
 const formatHeaderTime = value => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).format(value)
 const nonWorkingLabel = day => ({ weekend: 'Weekend', holiday: 'Holiday', special_leave: 'Special leave' }[day.day_type] || 'Non-working day')
 
-export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly, goMeeting, goUpdate, goCalendar, onDateChange }) {
+export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly, goMeeting, goProduction, goUpdate, goCalendar, onDateChange }) {
   const { employees, departments, calendarDay, isWorkingDay, loading, error, date, reload } = data
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
@@ -45,7 +45,7 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
       <div><p className="eyebrow">PCMD - Vietsovpetro JV</p><h1>WORKING STATUS DASHBOARD</h1><p className="subtle">Last updated: {formatDateTime(latest)}</p></div>
       <div className="header-actions-wrap"><div className="top-actions"><span className="user-chip">{profile.full_name}</span><button className="secondary-button" onClick={goUpdate}>My Status</button>{profile.role === 'admin' && <><button className="secondary-button" onClick={goAdmin}>Admin</button><button className="secondary-button" onClick={goCalendar}>Work calendar</button><button className="secondary-button reset-button" onClick={() => setResetPassword(true)}>Reset password</button></>}<button className="text-button" onClick={onSignOut}>Sign out</button><MeetingNotifications employeeId={profile.id} onOpenMyStatus={goUpdate}/></div><time className="header-clock">{formatHeaderDate(now)}<br/><b>{formatHeaderTime(now)}</b></time></div>
     </header>
-    <nav className="dashboard-navigation" aria-label="Dashboard pages"><button className="secondary-button" onClick={goMonthly}>Monthly statistics</button><button className="secondary-button" onClick={goMeeting}>Meeting Info</button></nav>
+    <nav className="dashboard-navigation" aria-label="Dashboard pages"><button className="secondary-button" onClick={goMonthly}>Monthly statistics</button><button className="secondary-button" onClick={goMeeting}>Meeting Info</button><button className="production-dashboard-tab" onClick={goProduction}>Block 09-2/09 production</button></nav>
     <section className="toolbar"><SearchBox value={query} onChange={setQuery}/><label className="dashboard-date">Display date<input type="date" value={date} onChange={event => onDateChange(event.target.value)} /></label><StatusFilter value={filter} onChange={setFilter} departmentValue={departmentFilter} onDepartmentChange={setDepartmentFilter} departments={departments}/></section>
     {error && <p className="notice error">{error}</p>}
     {loading ? <p className="loading">Loading data...</p> : !isWorkingDay ? <>

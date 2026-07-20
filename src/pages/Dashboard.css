@@ -84,6 +84,20 @@
   padding: 9px 15px;
 }
 
+.production-dashboard-tab {
+  margin-left: auto;
+  padding: 9px 15px;
+  border: 1px solid #2596be;
+  border-radius: 8px;
+  background: #2596be;
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.production-dashboard-tab:hover { background: #1d7f9f; border-color: #1d7f9f; }
+
 .dashboard-date-badge {
   display: inline-flex;
   margin-top: 8px;
@@ -211,6 +225,7 @@
 @media (max-width: 640px) {
   .dashboard-navigation { overflow-x: auto; }
   .dashboard-navigation .secondary-button { flex: 0 0 auto; }
+  .production-dashboard-tab { flex: 0 0 auto; margin-left: 0; }
 
   .operations-header { padding: 16px; }
   .operations-header h1 { font-size: 21px; }
