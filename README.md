@@ -74,6 +74,10 @@ Sau khi cập nhật code có thêm tính năng meeting, notification hoặc ove
 
 Đặt `must_change_password = true` nếu muốn user phải đổi mật khẩu ở lần đăng nhập tiếp theo.
 
+### Admin đặt mật khẩu tạm
+
+Nút **Reset password** trên Dashboard gọi Supabase Edge Function `admin-set-password`. Admin nhập mật khẩu tạm; Function kiểm tra quyền Admin, đổi mật khẩu trong Supabase Auth và tự đặt `profiles.must_change_password = true`. Xem hướng dẫn deploy và kiểm thử đầy đủ tại [SUPABASE_EDGE_FUNCTION_SETUP.md](./SUPABASE_EDGE_FUNCTION_SETUP.md).
+
 ## Quy tắc dữ liệu
 
 - `daily_status` là nguồn dữ liệu gốc cho trạng thái và thống kê.

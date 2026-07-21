@@ -1,0 +1,4 @@
+[functions.admin-set-password]
+# Password management is sensitive: the Supabase gateway must reject callers
+# without a valid signed-in user JWT before this Function starts.
+verify_jwt = true
