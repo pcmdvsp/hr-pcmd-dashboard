@@ -19,7 +19,7 @@ const datesInRange = (start, end) => {
   return dates
 }
 
-export default function StatusForm({ employee, onSaved, onClose }) {
+export default function StatusForm({ employee, onSaved, onClose, initialDate = today(), canEditHistory = false }) {
   const [status, setStatus] = useState('leave')
   const [startDate, setStartDate] = useState(today())
   const [endDate, setEndDate] = useState(today())
@@ -51,8 +51,8 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     const draft = onClose ? null : readDraft(employee.id)
     setDraftInitialized(false)
     setStatus(draft?.status || employee.daily?.status || employee.displayStatus || 'working')
-    setStartDate(draft?.startDate || today())
-    setEndDate(draft?.endDate || today())
+    setStartDate(draft?.startDate || initialDate)
+    setEndDate(draft?.endDate || initialDate)
     setNote(draft?.note || employee.daily?.note || '')
     setContent(draft?.content || employee.daily?.content || '')
     setLocation(draft?.location || employee.daily?.location || '')
@@ -67,7 +67,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     setOvertimeDates([])
     setSaved(false)
     setDraftInitialized(true)
-  }, [employee, onClose])
+  }, [employee, onClose, initialDate])
   useEffect(() => {
     if (onClose || !draftInitialized || saved) return
     sessionStorage.setItem(draftKey(employee.id), JSON.stringify({ status, startDate, endDate, note, content, location, onlineLink, startTime, endTime, participantQuery, selectedIds }))
@@ -170,6 +170,17 @@ export default function StatusForm({ employee, onSaved, onClose }) {
         ]).then(results => ({ error: results.find(item => item.error)?.error || null }))
         : await supabase.from('daily_status').upsert(dates.map(date => ({ employee_id: employee.id, date, status, is_overtime: false, note: needsDetails ? null : note.trim() || null, content: needsDetails ? content.trim() : null, location: needsDetails ? location.trim() : null, start_time: null, end_time: null })), { onConflict: 'employee_id,date' })
       if (result.error) { setSaving(false); return setError(result.error.message) }
+      if (['business_trip', 'leave', 'sick'].includes(status)) {
+        const notificationResult = await supabase.from('status_update_notifications').insert({
+          employee_id: employee.id,
+          status,
+          start_date: startDate,
+          end_date: endDate,
+          content: status === 'business_trip' ? content.trim() : null,
+          location: status === 'business_trip' ? location.trim() : status === 'leave' ? note.trim() : null,
+        })
+        if (notificationResult.error) console.error('Unable to create status update notification:', notificationResult.error.message)
+      }
     }
     setSaving(false); setSaved(true); showSuccessAlert('Your status has been updated successfully.'); onSaved?.(); onClose?.()
   }
@@ -178,7 +189,7 @@ export default function StatusForm({ employee, onSaved, onClose }) {
     <div className="form-title"><div><p className="eyebrow">UPDATE STATUS</p>{onClose && <h2>{employee.full_name}</h2>}</div>{onClose && <button type="button" className="close" onClick={onClose} aria-label="Close">×</button>}</div>
     <label>Status<select value={status} onChange={event => { setStatus(event.target.value); markChanged() }}>{selectableStatuses.map(key => <option key={key} value={key}>{STATUS[key].label}</option>)}</select></label>
     <div className="date-range" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
-      <label>From date<input type="date" min={today()} value={startDate} onChange={event => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged() }} /></label>
+      <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={event => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged() }} /></label>
       <label>To date<input type="date" min={startDate} value={endDate} onChange={event => { setEndDate(event.target.value); markChanged() }} /></label>
     </div>
     {status === 'meeting' && <>

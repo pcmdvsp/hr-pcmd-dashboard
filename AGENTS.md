@@ -87,6 +87,7 @@ Run SQL files in this order for a new project:
 1. `supabase_schema.sql`
 2. `supabase_monthly_statistics.sql`
 3. `supabase_meeting_info.sql`
+4. `supabase_status_notifications.sql`
 
 Optional repair scripts:
 

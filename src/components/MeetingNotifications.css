@@ -13,6 +13,8 @@
 .notification-item span, .notification-item small { color: #627991; font-size: 12px; }
 .notification-item.is-cancelled { background: #fff7f6; }
 .notification-item.is-cancelled b { color: #b42318; }
+.notification-item.is-status-update { background: #f3f9fd; }
+.notification-item.is-status-update b { color: #1e5e89; }
 
 @media (max-width: 640px) {
   .notification-panel { position: fixed; top: 76px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 96px); overflow-y: auto; }

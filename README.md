@@ -11,6 +11,7 @@
 - My Status gồm lịch 14 ngày, trạng thái cuối tuần/ngày lễ, Business trip kéo dài và overtime cuối tuần.
 - Meeting Info: tạo, sửa, hủy cuộc họp; người tham gia, nội dung, địa điểm, Online Link, kiểm tra trùng KNT meeting room và thêm nhanh thành viên theo phòng ban.
 - Meeting notification: chuông thông báo cá nhân cho meeting mới, meeting được cập nhật và meeting bị hủy.
+- Status notification: thông báo toàn hệ thống khi nhân sự cập nhật Business trip, Annual leave hoặc Sick leave.
 - Xuất file `.ics` để người tham gia thêm meeting vào Outlook Calendar với reminder 10 phút.
 - Phân quyền admin/normal user bằng Supabase RLS.
 
@@ -57,6 +58,7 @@ Trong Supabase **SQL Editor**, chạy các file theo thứ tự sau:
 1. [`supabase_schema.sql`](./supabase_schema.sql) — cấu trúc nền tảng: `profiles`, `departments`, `daily_status`, RLS và hàm đổi mật khẩu.
 2. [`supabase_monthly_statistics.sql`](./supabase_monthly_statistics.sql) — `work_calendar`, RLS calendar và function thống kê tháng.
 3. [`supabase_meeting_info.sql`](./supabase_meeting_info.sql) — bảng meetings/attendees/views/cancellation notifications, Online Link, overtime và các policy liên quan.
+4. [`supabase_status_notifications.sql`](./supabase_status_notifications.sql) — notification trạng thái và read-state riêng cho từng user.
 
 Các file hỗ trợ chỉ chạy khi cần:
 

@@ -1,0 +1,18 @@
+﻿id,email,employee_code,full_name,department_id,role,position,active,must_change_password
+e91c7e93-21ec-4f8c-897e-40a463c55eca,dungntp.cd@vietsov.com.vn,21225,Nguyễn Thị Phương Dung,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kỹ sư,TRUE,TRUE
+f0aaa50d-6df7-4ccb-9012-db95a45550d4,tinhph.pt@vietsov.com.vn,14166,Phạm Hữu Tính,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Chuyên viên chính,TRUE,TRUE
+b3eecf83-fbce-4d4f-8f04-70c8a7004ed5,hoanghh.pt@vietsov.com.vn,20254,Hoàng Huy Hoàng,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kỹ sư,TRUE,TRUE
+7e27382e-a897-4f96-a51f-688746b79cd0,longpn.hq@vietsov.com.vn,18278,Phạm Lê Ngọc Long,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kỹ sư,TRUE,TRUE
+3b154f1f-6653-4ea1-b5d9-b1297ad498b1,minhlh.rd@vietsov.com.vn,22274,Lưu Hoàng Minh,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kỹ sư,TRUE,TRUE
+81c5a466-918e-46f0-8636-68705a8d4489,binhpv.rd@vietsov.com.vn,18663,Phạm Văn Bính,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Chuyên viên chính,TRUE,TRUE
+aa03aaf8-7a17-4b67-9f09-aefaa0fc604d,danvd.sd@vietsov.com.vn,22078,Vũ Đình Dân,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kế toán,TRUE,TRUE
+7d1d16be-9d1a-4beb-9283-5aa7a9d9ed4d,thaonp.rd@vietsov.com.vn,19434,Nguyễn Phương Thảo,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Kỹ sư,TRUE,TRUE
+ffba11c8-329d-4209-a5f9-a84fbc616088,kientt.hq@vietsov.com.vn,18279,Trần Trung Kiên,9c3e7311-5c43-4591-b67f-26de319a8ae5,normal,Trưởng nhóm,TRUE,TRUE
+2238e627-7fdd-4e9d-a9d9-061eb70d20d0,khaidm.cd@vietsov.com.vn,21601,Dương Mạnh Khải,9c3e7311-5c43-4591-b67f-26de319a8ae5,normal,Kỹ sư,TRUE,TRUE
+07717177-ab2a-4910-ab05-f8bf2c7e1b88,duongph.pt@vietsov.com.vn,07HDDK,Phạm Hoàng Dương,9c3e7311-5c43-4591-b67f-26de319a8ae5,normal,Kỹ sư,TRUE,TRUE
+94418441-7411-44a9-ad84-5d1f3c077a94,solomonova.hq@vietsov.com.vn,22070,Solomonova Marina,9c3e7311-5c43-4591-b67f-26de319a8ae5,normal,Chuyên viên chính,TRUE,TRUE
+7dedd048-db8c-4a30-a4e5-5ed5ceff0d0f,mailtv.pt@vietsov.com.vn,20545,Lã Thị Vân Mai ,a619ce92-fdaa-42c4-91d2-5db40592cc6a,normal,Kỹ sư,TRUE,TRUE
+7387d786-fad1-4d59-9def-afcd3009d821,hungnq.rd@vietsov.com.vn,21207,Ngô Quang Hùng,2b9f0a56-386c-4599-b262-aec6f609bdbc,normal,Kỹ sư,TRUE,TRUE
+f8ea45d2-62bc-4dea-9214-c6123c6d9c0a,truongtx.dr@vietsov.com.vn,16042,Tạ Xuân Trường,2b9f0a56-386c-4599-b262-aec6f609bdbc,normal,Chuyên viên chính,TRUE,TRUE
+c128d9d2-3e4e-4a01-ac75-a01e8e4ed0da,thanhlk.rd@vietsov.com.vn,20600,Lê Thị Kim Thanh,d0cf2324-9dc0-4f1a-998d-9f7fec558409,normal,Kế toán,TRUE,TRUE
+517db8c4-8f78-4b64-b9fa-a33b936dcf93,linhnpt.rd@vietsov.com.vn,20960,Nguyễn Phạm Thùy Linh,d0cf2324-9dc0-4f1a-998d-9f7fec558409,normal,Kỹ sư,TRUE,TRUE

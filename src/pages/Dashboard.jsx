@@ -59,7 +59,7 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
       <section className="department-grid">{visibleDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/>)}</section>
       {visible.length === 0 && <div className="dashboard-empty"><span>◌</span><p>No matching employees found.</p></div>}
     </>}
-    {edit && <div className="modal-backdrop"><div className="modal"><StatusForm employee={edit} onSaved={reload} onClose={() => setEdit(null)}/></div></div>}
+    {edit && <div className="modal-backdrop"><div className="modal"><StatusForm employee={edit} initialDate={date} canEditHistory={profile.role === 'admin'} onSaved={reload} onClose={() => setEdit(null)}/></div></div>}
     {resetPassword && <ResetPasswordDialog employees={employees} onClose={() => setResetPassword(false)} />}
   </main>
 }

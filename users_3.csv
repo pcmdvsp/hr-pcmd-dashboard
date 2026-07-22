@@ -1,0 +1,4 @@
+﻿id,email,employee_code,full_name,department_id,role,position,active,must_change_password
+68197a9f-6832-47b0-ba46-12a3954a6735,duyt.hq@vietsov.com.vn ,19593,Tạ Duy,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Trưởng Lô,TRUE,TRUE
+39bbe2ee-11b1-41b0-8cd3-fd6db3e74229,taitt.pt@vietsov.com.vn,13143,Trần Thành Tài,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Phó trưởng Lô,TRUE,TRUE
+be3e744b-0ad9-43fb-90e4-7c7b54dfc51c,nguyenvh.pt@vietsov.com.vn,21121,Vàng Hiếu Nguyên,9fa4476a-8f7b-4051-8c5a-bb281efc3317,normal,Chuyên viên chính Cơ khí,TRUE,TRUE

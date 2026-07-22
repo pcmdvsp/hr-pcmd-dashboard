@@ -42,11 +42,15 @@ npx supabase@latest --version
 npx supabase@latest login
 ```
 
-CLI sẽ yêu cầu Personal Access Token. Tạo token tại Supabase Dashboard → **Account → Access Tokens**, sau đó dán token vào terminal.
+CLI sẽ yêu cầu Personal Access Token (thường sẽ tạo tự động, nhập token trên web vào cmd) nếu không thì Tạo token tại Supabase Dashboard → **Account → Access Tokens**, sau đó dán token vào terminal.
 
 ## 4. Liên kết với Supabase project
 
-Lấy **Project Reference ID** tại Supabase Dashboard → **Settings → General**.
+Lấy **Project Reference ID** tại Supabase Project -> Intergations -> Data API --> API URL
+
+Hoặc chạy tại cmd lệnh
+
+supabase projects list
 
 Chạy lệnh, thay `YOUR_PROJECT_REF` bằng Project Reference ID thực tế:
 
