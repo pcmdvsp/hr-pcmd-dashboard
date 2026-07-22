@@ -286,6 +286,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
             <MeetingEditor
               meeting={editing}
               employees={employees}
+              departments={departments}
               attendeeIds={selectedAttendeeIds}
               onClose={() => setEditing(null)}
               onSaved={() => {
@@ -375,7 +376,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   );
 }
 
-function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
+function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, onSaved }) {
   const [content, setContent] = useState(meeting.content || "");
   const [location, setLocation] = useState(meeting.location || "");
   const [onlineLink, setOnlineLink] = useState(meeting.online_link || "");
@@ -410,6 +411,14 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
         )
       : [];
   }, [employees, query]);
+  const departmentResults = useMemo(() => {
+    const text = query.trim().toLowerCase();
+    return text
+      ? departments.filter((department) =>
+          department.name.toLowerCase().includes(text),
+        )
+      : [];
+  }, [departments, query]);
   const selectedEmployees = useMemo(
     () => employees.filter((employee) => selectedIds.includes(employee.id)),
     [employees, selectedIds],
@@ -419,6 +428,16 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
       setSelectedIds((ids) =>
         ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id],
       );
+  };
+  const addDepartmentParticipants = (departmentId) => {
+    const availableIds = employees
+      .filter(
+        (employee) =>
+          employee.department_id === departmentId && !unavailable.has(employee.id),
+      )
+      .map((employee) => employee.id);
+    setSelectedIds((ids) => [...new Set([...ids, ...availableIds])]);
+    setQuery("");
   };
 
   const submit = async (event) => {
@@ -584,7 +603,7 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
         />
       </label>
       <p className="subtle">Selected participants</p>
-      <div className="employee-list" aria-label="Selected meeting participants">
+      <div className="employee-list meeting-selected-participants" aria-label="Selected meeting participants">
         {selectedEmployees.map((employee) => {
           const reason = unavailable.get(employee.id);
           return (
@@ -622,6 +641,17 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
           className="employee-list"
           aria-label="Meeting participant search results"
         >
+          {departmentResults.map((department) => (
+            <button
+              type="button"
+              key={department.id}
+              className="employee-badge is-editable"
+              onClick={() => addDepartmentParticipants(department.id)}
+            >
+              {department.name}{" "}
+              <span className="employee-code">Add available members</span>
+            </button>
+          ))}
           {results.map((employee) => {
             const reason = unavailable.get(employee.id);
             return (
@@ -643,8 +673,8 @@ function MeetingEditor({ meeting, employees, attendeeIds, onClose, onSaved }) {
               </button>
             );
           })}
-          {results.length === 0 && (
-            <p className="empty">No matching employees</p>
+          {results.length === 0 && departmentResults.length === 0 && (
+            <p className="empty">No matching employees or departments</p>
           )}
         </div>
       )}

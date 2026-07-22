@@ -34,6 +34,12 @@
   color: #b42318;
   border-color: #e7a5a0;
 }
+.meeting-selected-participants {
+  max-height: 170px;
+  overflow-y: auto;
+  align-content: flex-start;
+  padding-right: 5px;
+}
 
 /* Content and time are deliberately prioritized for the meeting agenda. */
 .meeting-info-table {

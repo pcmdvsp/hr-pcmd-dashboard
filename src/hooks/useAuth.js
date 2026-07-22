@@ -16,7 +16,24 @@ export function useAuth() {
     }
     supabase.auth.getSession().then(({ data }) => load(data.session))
     const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => load(next))
-    return () => listener.subscription.unsubscribe()
+    // Mobile browsers commonly pause timers while the app is in the background.
+    // Refresh the persisted session when the page becomes active again instead
+    // of relying only on the background auto-refresh timer.
+    const restoreWhenActive = async () => {
+      if (document.visibilityState === 'hidden') return
+      const { data: { session: storedSession } } = await supabase.auth.getSession()
+      if (!storedSession) return
+      const { data, error } = await supabase.auth.refreshSession()
+      if (!error && data.session) load(data.session)
+    }
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') restoreWhenActive() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('focus', restoreWhenActive)
+    return () => {
+      listener.subscription.unsubscribe()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('focus', restoreWhenActive)
+    }
   }, [])
 
   return { session, profile, refreshProfile: async () => {

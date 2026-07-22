@@ -4,6 +4,8 @@
   .auth-layout { padding: 12px; }
   .auth-card { width: 100%; max-width: 100%; padding: 18px; }
   .update-card { width: 100%; max-width: 100%; }
+  .modal-backdrop { padding: 12px; }
+  .modal { max-height: calc(100vh - 24px); }
 
   .topbar { gap: 16px; margin-bottom: 20px; }
   .top-actions { flex-wrap: wrap; }

@@ -1,0 +1,3 @@
+id	email	employee_code	full_name	department_id	role	position	active	must_change_password
+bf0db85c-d72d-4ca1-8055-7401e0784a59	hapham.hq@vietsov.com.vn	16210	Ph?m Thanh Hà		normal	Phó tr??ng Ban	TRUE	TRUE
+e16315a5-f5c6-4b83-89db-81bbb05d7552	kozyk.rd@vietsov.com.vn	19629	Kozyk Sergey		normal	Phó tr??ng Ban	TRUE	TRUE
