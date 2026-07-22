@@ -6,7 +6,8 @@
 .notification-panel header { display: flex; justify-content: space-between; align-items: center; padding: 13px 15px; border-bottom: 1px solid #e5edf3; }
 .notification-panel header span { color: #6d8298; font-size: 12px; }
 .notification-panel > p { margin: 0; padding: 18px 15px; color: #718095; font-size: 13px; }
-.notification-item { display: grid; gap: 4px; width: 100%; padding: 13px 15px; border: 0; border-bottom: 1px solid #edf2f6; background: #fff; color: #294560; text-align: left; cursor: pointer; }
+.notification-list { max-height: min(560px, calc(100vh - 150px)); overflow-y: auto; overscroll-behavior: contain; }
+.notification-item { position: relative; display: grid; gap: 4px; width: 100%; padding: 13px 58px 13px 15px; border: 0; border-bottom: 1px solid #edf2f6; background: #fff; color: #294560; text-align: left; cursor: pointer; }
 .notification-item:last-child { border-bottom: 0; }
 .notification-item:hover { background: #f2f8fd; }
 .notification-item b { font-size: 14px; }
@@ -15,7 +16,9 @@
 .notification-item.is-cancelled b { color: #b42318; }
 .notification-item.is-status-update { background: #f3f9fd; }
 .notification-item.is-status-update b { color: #1e5e89; }
+.notification-new-tag { position: absolute; top: 13px; right: 14px; padding: 3px 7px; border-radius: 999px; background: #e4f2fd; color: #176c9d; font-size: 10px; font-style: normal; font-weight: 700; text-transform: uppercase; }
 
 @media (max-width: 640px) {
-  .notification-panel { position: fixed; top: 76px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 96px); overflow-y: auto; }
+  .notification-panel { position: fixed; top: 76px; right: 12px; left: 12px; width: auto; max-height: calc(100vh - 96px); }
+  .notification-list { max-height: calc(100vh - 150px); }
 }

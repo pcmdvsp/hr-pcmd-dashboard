@@ -22,7 +22,7 @@ export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
     const [attendeeResult, viewResult, cancellationResult, statusResult, statusReadResult] = await Promise.all([
       supabase.from('employee_meeting_attendees').select('meeting_id').eq('employee_id', employeeId),
       supabase.from('employee_meeting_views').select('meeting_id,seen_at,seen_meeting_updated_at,notification_meeting_updated_at').eq('employee_id', employeeId),
-      supabase.from('employee_meeting_cancellations').select('id,content,meeting_date,start_time,end_time,location,cancelled_at,read_at').eq('employee_id', employeeId).is('read_at', null).order('cancelled_at', { ascending: false }),
+      supabase.from('employee_meeting_cancellations').select('id,content,meeting_date,start_time,end_time,location,cancelled_at,read_at').eq('employee_id', employeeId).order('cancelled_at', { ascending: false }).limit(100),
       supabase.from('status_update_notifications').select('id,employee_id,status,start_date,end_date,content,location,created_at').order('created_at', { ascending: false }).limit(100),
       supabase.from('status_update_notification_reads').select('notification_id').eq('employee_id', employeeId),
     ])
@@ -54,27 +54,30 @@ export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
 
   const notifications = useMemo(() => {
     const viewById = new Map(views.map(view => [view.meeting_id, view]))
-    const meetingNotifications = meetings.filter(meeting => {
+    const meetingNotifications = meetings.map(meeting => {
       const view = viewById.get(meeting.id)
-      return !view || new Date(meeting.updated_at) > new Date(view.notification_meeting_updated_at || 0)
-    }).map(meeting => ({ ...meeting, kind: 'meeting', notificationDate: meeting.updated_at }))
-    const cancellationNotifications = cancellations.map(cancellation => ({ ...cancellation, kind: 'cancelled', notificationDate: cancellation.cancelled_at }))
+      return { ...meeting, kind: 'meeting', notificationDate: meeting.updated_at, isNew: !view || new Date(meeting.updated_at) > new Date(view.notification_meeting_updated_at || 0) }
+    })
+    const cancellationNotifications = cancellations.map(cancellation => ({ ...cancellation, kind: 'cancelled', notificationDate: cancellation.cancelled_at, isNew: !cancellation.read_at }))
     const statusNotifications = statusUpdates
-      .filter(update => !statusReads.some(read => read.notification_id === update.id))
-      .map(update => ({ ...update, kind: 'status', notificationDate: update.created_at }))
-    return [...cancellationNotifications, ...meetingNotifications, ...statusNotifications].sort((a, b) => new Date(b.notificationDate) - new Date(a.notificationDate))
+      .map(update => ({ ...update, kind: 'status', notificationDate: update.created_at, isNew: !statusReads.some(read => read.notification_id === update.id) }))
+    return [...cancellationNotifications, ...meetingNotifications, ...statusNotifications]
+      .sort((a, b) => new Date(b.notificationDate) - new Date(a.notificationDate))
+      .slice(0, 15)
   }, [meetings, views, cancellations, statusUpdates, statusReads])
+
+  const unreadCount = useMemo(() => notifications.filter(notification => notification.isNew).length, [notifications])
 
   const openNotification = async notification => {
     if (notification.kind === 'status') {
       const result = await supabase.from('status_update_notification_reads').upsert({ notification_id: notification.id, employee_id: employeeId }, { onConflict: 'notification_id,employee_id' })
-      if (!result.error) setStatusReads(current => [...current, { notification_id: notification.id }])
+      if (!result.error) setStatusReads(current => current.some(item => item.notification_id === notification.id) ? current : [...current, { notification_id: notification.id }])
       setOpen(false)
       return
     }
     if (notification.kind === 'cancelled') {
       const result = await supabase.from('employee_meeting_cancellations').update({ read_at: new Date().toISOString() }).eq('id', notification.id)
-      if (!result.error) setCancellations(current => current.filter(item => item.id !== notification.id))
+      if (!result.error) setCancellations(current => current.map(item => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
     } else {
       const seenAt = new Date().toISOString()
       const currentView = views.find(view => view.meeting_id === notification.id)
@@ -87,11 +90,11 @@ export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
 
   return <div className="meeting-notifications">
     <button type="button" className="notification-bell" aria-label="Notifications" aria-expanded={open} onClick={() => { setOpen(value => !value); if (!open) load() }}>
-      <Bell size={18} strokeWidth={2.2}/>{notifications.length > 0 && <b>{notifications.length > 99 ? '99+' : notifications.length}</b>}
+      <Bell size={18} strokeWidth={2.2}/>{unreadCount > 0 && <b>{unreadCount > 99 ? '99+' : unreadCount}</b>}
     </button>
     {open && <section className="notification-panel" aria-label="Notifications">
-      <header><strong>Notifications</strong><span>{notifications.length} new</span></header>
-      {notifications.length ? <div>{notifications.map(notification => <button type="button" className={`notification-item ${notification.kind === 'cancelled' ? 'is-cancelled' : ''} ${notification.kind === 'status' ? 'is-status-update' : ''}`} key={`${notification.kind}-${notification.id}`} onClick={() => openNotification(notification)}>{notification.kind === 'status' ? <><b>{notification.full_name} updated his status to {statusLabel[notification.status]}.</b><span>{statusDateRange(notification)}</span>{notification.status === 'business_trip' && <><small>Content: {notification.content || 'Not specified'}</small><small>Location: {notification.location || 'Not specified'}</small></>}{notification.status === 'leave' && <small>Location: {notification.location || 'Not specified'}</small>}</> : <><b>{notification.kind === 'cancelled' ? `Canceled: ${notification.content}` : notification.content || 'Meeting'}</b><span>{formatDate(notification.kind === 'cancelled' ? notification.meeting_date : notification.date)} · {formatTime(notification.start_time)} – {formatTime(notification.end_time)}</span><small>{notification.location || 'Location not specified'}</small></>}</button>)}</div> : <p>No new notifications.</p>}
+      <header><strong>Notifications</strong><span>{unreadCount} new</span></header>
+      {notifications.length ? <div className="notification-list">{notifications.map(notification => <button type="button" className={`notification-item ${notification.kind === 'cancelled' ? 'is-cancelled' : ''} ${notification.kind === 'status' ? 'is-status-update' : ''}`} key={`${notification.kind}-${notification.id}`} onClick={() => openNotification(notification)}>{notification.kind === 'status' ? <><b>{notification.full_name} updated his status to {statusLabel[notification.status]}.</b><span>{statusDateRange(notification)}</span>{notification.status === 'business_trip' && <><small>Content: {notification.content || 'Not specified'}</small><small>Location: {notification.location || 'Not specified'}</small></>}{notification.status === 'leave' && <small>Location: {notification.location || 'Not specified'}</small>}</> : <><b>{notification.kind === 'cancelled' ? `Canceled: ${notification.content}` : notification.content || 'Meeting'}</b><span>{formatDate(notification.kind === 'cancelled' ? notification.meeting_date : notification.date)} · {formatTime(notification.start_time)} – {formatTime(notification.end_time)}</span><small>{notification.location || 'Location not specified'}</small></>}{notification.isNew && <em className="notification-new-tag">New</em>}</button>)}</div> : <p>No notifications yet.</p>}
     </section>}
   </div>
 }
