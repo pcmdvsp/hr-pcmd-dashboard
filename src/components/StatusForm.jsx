@@ -33,6 +33,8 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
   const [departments, setDepartments] = useState([])
   const [participantQuery, setParticipantQuery] = useState('')
   const [selectedIds, setSelectedIds] = useState([])
+  const [tripParticipantQuery, setTripParticipantQuery] = useState('')
+  const [tripParticipantIds, setTripParticipantIds] = useState([])
   const [selectedDepartment, setSelectedDepartment] = useState(null)
   const [unavailable, setUnavailable] = useState(new Map())
   const [saving, setSaving] = useState(false)
@@ -61,6 +63,8 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
     setEndTime(draft?.endTime || employee.daily?.end_time?.slice(0, 5) || '')
     setParticipantQuery(draft?.participantQuery || '')
     setSelectedIds(draft?.selectedIds || (employee.id ? [employee.id] : []))
+    setTripParticipantQuery(draft?.tripParticipantQuery || '')
+    setTripParticipantIds(draft?.tripParticipantIds || (employee.id ? [employee.id] : []))
     setSelectedDepartment(null)
     setConfirmOvertime(false)
     setOvertimeApproved(false)
@@ -70,14 +74,14 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
   }, [employee, onClose, initialDate])
   useEffect(() => {
     if (onClose || !draftInitialized || saved) return
-    sessionStorage.setItem(draftKey(employee.id), JSON.stringify({ status, startDate, endDate, note, content, location, onlineLink, startTime, endTime, participantQuery, selectedIds }))
-  }, [employee.id, onClose, draftInitialized, saved, status, startDate, endDate, note, content, location, onlineLink, startTime, endTime, participantQuery, selectedIds])
+    sessionStorage.setItem(draftKey(employee.id), JSON.stringify({ status, startDate, endDate, note, content, location, onlineLink, startTime, endTime, participantQuery, selectedIds, tripParticipantQuery, tripParticipantIds }))
+  }, [employee.id, onClose, draftInitialized, saved, status, startDate, endDate, note, content, location, onlineLink, startTime, endTime, participantQuery, selectedIds, tripParticipantQuery, tripParticipantIds])
   useEffect(() => { if (!onClose && saved) sessionStorage.removeItem(draftKey(employee.id)) }, [employee.id, onClose, saved])
   useEffect(() => {
-    if (status !== 'meeting') return
+    if (status !== 'meeting' && !(status === 'business_trip' && !onClose)) return
     Promise.all([
       supabase.from('profiles').select('id,full_name,employee_code,department_id').eq('active', true).order('full_name'),
-      supabase.from('departments').select('id,name,sort_order').order('sort_order'),
+      status === 'meeting' ? supabase.from('departments').select('id,name,sort_order').order('sort_order') : Promise.resolve({ data: [], error: null }),
     ]).then(([employeeResult, departmentResult]) => {
       if (employeeResult.error || departmentResult.error) setError(employeeResult.error?.message || departmentResult.error?.message)
       else { setEmployees(employeeResult.data || []); setDepartments(departmentResult.data || []) }
@@ -99,6 +103,11 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
     const query = participantQuery.trim().toLowerCase()
     return query ? departments.filter(department => department.name.toLowerCase().includes(query)) : []
   }, [departments, participantQuery])
+  const filteredTripEmployees = useMemo(() => {
+    const query = tripParticipantQuery.trim().toLowerCase()
+    return query ? employees.filter(item => item.id !== employee.id && `${item.full_name} ${item.employee_code}`.toLowerCase().includes(query)) : []
+  }, [employees, tripParticipantQuery, employee.id])
+  const selectedTripEmployees = useMemo(() => employees.filter(item => tripParticipantIds.includes(item.id)), [employees, tripParticipantIds])
   const organizerUnavailableReason = unavailable.get(employee.id)
   const markChanged = () => { setSaved(false); setOvertimeApproved(false); setOvertimeDates([]) }
   const toggleParticipant = id => {
@@ -112,6 +121,10 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
     setSelectedIds(ids => [...new Set([...ids, ...members.map(member => member.id)])])
     setSelectedDepartment(department || null)
     setParticipantQuery('')
+    markChanged()
+  }
+  const toggleTripParticipant = id => {
+    setTripParticipantIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id])
     markChanged()
   }
 
@@ -163,14 +176,18 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
         }
       }
       const normalDates = dates.filter(date => !overtimeDates.includes(date))
-      const result = status === 'working'
+      const groupBusinessTrip = status === 'business_trip' && !onClose
+      const tripEmployeeIds = [...new Set([employee.id, ...tripParticipantIds])]
+      const result = groupBusinessTrip
+        ? await supabase.rpc('create_group_business_trip', { p_employee_ids: tripEmployeeIds, p_start_date: startDate, p_end_date: endDate, p_content: content.trim(), p_location: location.trim() })
+        : status === 'working'
         ? await Promise.all([
           normalDates.length ? supabase.from('daily_status').delete().eq('employee_id', employee.id).in('date', normalDates) : Promise.resolve({ error: null }),
           overtimeDates.length ? supabase.from('daily_status').upsert(overtimeDates.map(date => ({ employee_id: employee.id, date, status: 'working', is_overtime: true, note: null, content: null, location: null, start_time: null, end_time: null })), { onConflict: 'employee_id,date' }) : Promise.resolve({ error: null }),
         ]).then(results => ({ error: results.find(item => item.error)?.error || null }))
         : await supabase.from('daily_status').upsert(dates.map(date => ({ employee_id: employee.id, date, status, is_overtime: false, note: needsDetails ? null : note.trim() || null, content: needsDetails ? content.trim() : null, location: needsDetails ? location.trim() : null, start_time: null, end_time: null })), { onConflict: 'employee_id,date' })
       if (result.error) { setSaving(false); return setError(result.error.message) }
-      if (['business_trip', 'leave', 'sick'].includes(status)) {
+      if (['business_trip', 'leave', 'sick'].includes(status) && !groupBusinessTrip) {
         const notificationResult = await supabase.from('status_update_notifications').insert({
           employee_id: employee.id,
           status,
@@ -211,6 +228,18 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
         {filteredDepartments.map(department => <button type="button" key={department.id} className="employee-badge is-editable" onClick={() => addDepartmentParticipants(department.id)}>{department.name} <span className="employee-code">Add available members</span></button>)}
         {filteredEmployees.map(item => { const reason = unavailable.get(item.id); return <button type="button" key={item.id} disabled={Boolean(reason)} className={`employee-badge is-editable ${selectedIds.includes(item.id) ? 'is-selected' : ''}`} style={reason ? { opacity: .55, cursor: 'not-allowed' } : undefined} onClick={() => toggleParticipant(item.id)}>{selectedIds.includes(item.id) ? '✓ ' : ''}{item.full_name} <span className="employee-code">{reason ? `Unavailable: ${reason}` : item.employee_code}</span></button> })}
         {filteredEmployees.length === 0 && filteredDepartments.length === 0 && <p className="empty">No matching employees or departments</p>}
+      </div>}
+    </>}
+    {status === 'business_trip' && !onClose && <>
+      <label>Add colleagues to this business trip <span className="subtle">(optional)</span><input value={tripParticipantQuery} onChange={event => { setTripParticipantQuery(event.target.value); markChanged() }} placeholder="Search by name or employee ID" /></label>
+      <div className="employee-list" aria-label="Business trip participants">
+        <p className="subtle">Business trip participants</p>
+        <button type="button" className="employee-badge is-editable is-selected" onClick={() => {}}>{employee.full_name} <span className="employee-code">Trip organizer</span></button>
+        {selectedTripEmployees.filter(item => item.id !== employee.id).map(item => <button type="button" key={item.id} className="employee-badge is-editable is-selected" onClick={() => toggleTripParticipant(item.id)}>✓ {item.full_name} <span className="employee-code">{item.employee_code}</span></button>)}
+      </div>
+      {tripParticipantQuery.trim() && <div className="employee-list" aria-label="Business trip participant search results">
+        {filteredTripEmployees.map(item => <button type="button" key={item.id} className={`employee-badge is-editable ${tripParticipantIds.includes(item.id) ? 'is-selected' : ''}`} onClick={() => toggleTripParticipant(item.id)}>{tripParticipantIds.includes(item.id) ? '✓ ' : ''}{item.full_name} <span className="employee-code">{item.employee_code}</span></button>)}
+        {filteredTripEmployees.length === 0 && <p className="empty">No matching employees</p>}
       </div>}
     </>}
     {needsDetails ? <>
