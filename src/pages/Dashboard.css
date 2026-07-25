@@ -132,12 +132,14 @@
 
 .toolbar {
   margin: 30px 0;
-  gap: 12px;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .toolbar .search-box {
-  width: 260px;
-  flex: 0 1 260px;
+  width: 235px;
+  flex: 0 1 235px;
 }
 
 .toolbar .search-box input {
@@ -146,10 +148,19 @@
 
 .toolbar .status-filter {
   gap: 5px;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
+}
+.toolbar .status-filter-options {
+  overflow: visible;
+}
+.toolbar .status-filter button {
+  padding: 8px 9px;
+  font-size: 13px;
 }
 
 .toolbar .department-filter {
-  width: 170px;
+  width: 190px;
   padding-left: 8px;
   padding-right: 24px;
   text-align: left;
@@ -239,3 +250,70 @@
   .toolbar .dashboard-date input { width: 100%; }
   .toolbar .status-filter { width: 100%; }
 }
+
+.dashboard-view-toggle {
+  display: inline-flex;
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid #d2dfeb;
+  border-radius: 10px;
+  background: #f8fbfe;
+  order: 2;
+  flex: 0 0 100%;
+  width: max-content;
+}
+.dashboard-view-toggle button {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #45627e;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.dashboard-view-toggle button.is-active {
+  background: #ddecfa;
+  color: #1f5f98;
+  box-shadow: 0 4px 11px rgba(38, 105, 161, .2);
+}
+.dashboard-month-department {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  font-size: 0;
+}
+.dashboard-month-department select {
+  min-width: 170px;
+  min-height: 38px;
+  padding: 9px 28px 9px 9px;
+  border: 1px solid #d6e0eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #405a73;
+  font: inherit;
+  font-size: 14px;
+}
+.dashboard-period-button,
+.dashboard-period-input {
+  min-height: 38px;
+  border: 1px solid #d6e0eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #405a73;
+  font: inherit;
+}
+.dashboard-period-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 135px;
+  padding: 8px 11px;
+  text-align: center;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.dashboard-previous-period { width: 149px; }
+.dashboard-period-button:hover { background: #f4f8fc; }
+.dashboard-period-input { width: 174px; padding: 7px 9px; }
+.toolbar > :not(.dashboard-view-toggle) { order: 1; }

@@ -1,0 +1,52 @@
+.monthly-timeline-panel { padding: 20px; border: 1px solid #dce6ee; border-radius: 15px; background: #fff; box-shadow: 0 5px 16px #263d5a0d; }
+.monthly-timeline-panel > header { display: flex; justify-content: space-between; align-items: end; gap: 16px; margin-bottom: 16px; }
+.monthly-timeline-panel h2 { margin: 0; color: #203d59; font-size: 21px; }
+.monthly-timeline-panel header p:last-child { margin: 0; color: #718095; font-size: 13px; }
+.monthly-timeline-wrap { max-height: 68vh; overflow: auto; border: 1px solid #dce6ee; border-radius: 10px; }
+.monthly-timeline-table { width: 100%; min-width: 1180px; border-collapse: separate; border-spacing: 0; table-layout: fixed; font-size: 12px; }
+.monthly-timeline-table th, .monthly-timeline-table td { box-sizing: border-box; height: 39px; border-right: 1px solid #e8eef4; border-bottom: 1px solid #e8eef4; }
+.monthly-timeline-table thead th { position: sticky; top: 0; z-index: 3; width: 33px; min-width: 33px; padding: 5px 1px; background: #edf3f8; color: #405a73; text-align: center; }
+.monthly-timeline-table thead th small, .monthly-timeline-table thead th b { display: block; line-height: 1.1; }
+.monthly-timeline-table thead th small { font-size: 9px; font-weight: 600; text-transform: uppercase; }
+.monthly-timeline-table thead th b { margin-top: 3px; font-size: 13px; }
+.monthly-timeline-table thead th.is-holiday { background: #fde5ed; }
+.monthly-timeline-table thead th.is-today { background: #eaf6ff; box-shadow: none; }
+.monthly-timeline-table thead th.is-holiday.is-today { background: #eaf6ff; }
+.monthly-timeline-table .timeline-employee-header, .monthly-timeline-table .timeline-employee { position: sticky; left: 0; z-index: 2; width: 195px; min-width: 195px; text-align: left; }
+.monthly-timeline-table .timeline-employee-header { z-index: 4; padding-left: 12px; background: #edf3f8; }
+.monthly-timeline-table .timeline-employee { padding: 5px 11px; background: #fff; color: #203d59; }
+.timeline-employee b, .timeline-employee small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.timeline-employee b { font-size: 12px; }
+.timeline-employee small { margin-top: 2px; color: #7b8ca0; font-size: 10px; font-weight: 500; }
+.timeline-group th { position: sticky; left: 0; z-index: 1; height: 30px; padding: 0; border-right: 0; background: #dce8f3; color: #284d70; text-align: left; font-size: 12px; }
+.timeline-group button { display: flex; align-items: center; width: 100%; height: 30px; gap: 7px; padding: 7px 12px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 750; text-align: left; cursor: pointer; }
+.timeline-group button:hover { background: #d2e2f0; }
+.timeline-group button i { width: 11px; font-size: 16px; font-style: normal; line-height: 1; }
+.timeline-group span { margin-left: 7px; color: #607c97; font-weight: 500; }
+.timeline-cell { position: relative; padding: 4px 2px; background: #fff; }
+.timeline-cell.weekend, .timeline-cell.special_leave, .timeline-cell.is-off { background: #f7f8fa; }
+.monthly-timeline-table td.timeline-cell.holiday,
+.monthly-timeline-table td.timeline-cell.is-calendar-holiday { background: #fde5ed !important; }
+.timeline-cell.is-today { background-color: #f2faff; }
+.timeline-cell.is-today::after { content: ''; position: absolute; z-index: 2; top: 0; bottom: 0; left: 50%; width: 1px; background: #c4b5fd; opacity: .7; pointer-events: none; transform: translateX(-50%); }
+.timeline-cell span { display: block; width: 100%; height: 100%; min-height: 21px; border-radius: 999px; }
+.timeline-cell.is-working span {
+  display: none;
+}
+.timeline-cell.is-off span { display: none; }
+.timeline-cell.is-business_trip span { background: #f1c40f; }
+.timeline-cell.is-leave span { background: #3498db; }
+.timeline-cell.is-sick span { background: #e74c3c; }
+.timeline-cell.is-single span { width: 18px; margin-inline: auto; border-radius: 50%; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell { background: #eef5fb; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee { background: #dceefd; box-shadow: inset 4px 0 0 #2f80c4; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee b { color: #064f86; font-weight: 800; text-shadow: 0 1px 0 rgba(255, 255, 255, .9); }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee small { color: #256c9e; font-weight: 700; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell span { filter: brightness(1.22) saturate(1.15); box-shadow: 0 2px 5px rgba(41, 89, 128, .18); }
+.monthly-timeline-panel footer { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 14px; color: #526b83; font-size: 12px; }
+.monthly-timeline-panel footer span { display: inline-flex; align-items: center; gap: 6px; }
+.monthly-timeline-panel footer b { color: #203d59; }
+.monthly-timeline-panel footer i { width: 11px; height: 11px; border-radius: 50%; }
+.monthly-timeline-panel footer .timeline-working { box-sizing: border-box; border: 1px solid #cbd7e2; background: #fff; }
+.monthly-timeline-panel footer .timeline-off { background: linear-gradient(90deg, #cbd5df 0 50%, #f5bfd1 50% 100%); }
+@media (max-width: 640px) { .monthly-timeline-panel { padding: 14px; } .monthly-timeline-panel > header { align-items: start; flex-direction: column; gap: 5px; } .monthly-timeline-wrap { max-height: 60vh; } }

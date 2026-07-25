@@ -7,17 +7,21 @@ import SearchBox from '../components/SearchBox'
 import StatusOverview from '../components/StatusOverview'
 import ResetPasswordDialog from '../components/ResetPasswordDialog'
 import MeetingNotifications from '../components/MeetingNotifications'
-import { formatDateTime } from '../utils/status'
+import MonthlyEmployeeTimeline from '../components/MonthlyEmployeeTimeline'
+import { formatDateTime, today } from '../utils/status'
 
 const formatHeaderDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(value)
 const formatHeaderTime = value => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', second: '2-digit', hour12: true }).format(value)
 const nonWorkingLabel = day => ({ weekend: 'Weekend', holiday: 'Holiday', special_leave: 'Special leave' }[day.day_type] || 'Non-working day')
+const moveDate = (date, amount) => { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() + amount); return value.toISOString().slice(0, 10) }
+const moveMonth = (date, amount) => { const value = new Date(`${date}T12:00:00`); value.setMonth(value.getMonth() + amount); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-01` }
 
 export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly, goMeeting, goProduction, goUpdate, goCalendar, onDateChange }) {
   const { employees, departments, calendarDay, isWorkingDay, loading, error, date } = data
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
+  const [viewMode, setViewMode] = useState('day')
   const [resetPassword, setResetPassword] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
@@ -44,9 +48,9 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
       <div className="header-actions-wrap"><div className="top-actions"><span className="user-chip">{profile.full_name}</span><button className="secondary-button" onClick={goUpdate}>My Status</button>{profile.role === 'admin' && <><button className="secondary-button" onClick={goAdmin}>Admin</button><button className="secondary-button" onClick={goCalendar}>Work calendar</button><button className="secondary-button reset-button" onClick={() => setResetPassword(true)}>Reset password</button></>}<button className="text-button" onClick={onSignOut}>Sign out</button><MeetingNotifications employeeId={profile.id} onOpenMyStatus={goUpdate}/></div><time className="header-clock">{formatHeaderDate(now)}<br/><b>{formatHeaderTime(now)}</b></time></div>
     </header>
     <nav className="dashboard-navigation" aria-label="Dashboard pages"><button className="secondary-button" onClick={goMonthly}>Monthly statistics</button><button className="secondary-button" onClick={goMeeting}>Meeting Info</button><button className="production-dashboard-tab" onClick={goProduction}>Block 09-2/09 production</button></nav>
-    <section className="toolbar"><SearchBox value={query} onChange={setQuery}/><label className="dashboard-date">Display date<input type="date" value={date} onChange={event => onDateChange(event.target.value)} /></label><StatusFilter value={filter} onChange={setFilter} departmentValue={departmentFilter} onDepartmentChange={setDepartmentFilter} departments={departments}/></section>
+    <section className="toolbar"><div className="dashboard-view-toggle"><button className={viewMode === 'day' ? 'is-active' : ''} onClick={() => { if (viewMode === 'month') onDateChange(today()); setViewMode('day') }}>By day</button><button className={viewMode === 'month' ? 'is-active' : ''} onClick={() => setViewMode('month')}>By month</button></div><button className="dashboard-period-button dashboard-previous-period" onClick={() => onDateChange(viewMode === 'month' ? moveMonth(date, -1) : moveDate(date, -1))}>← Previous {viewMode}</button><input className="dashboard-period-input" type={viewMode === 'month' ? 'month' : 'date'} value={viewMode === 'month' ? date.slice(0, 7) : date} onChange={event => onDateChange(viewMode === 'month' ? `${event.target.value}-01` : event.target.value)} /><button className="dashboard-period-button" onClick={() => onDateChange(viewMode === 'month' ? moveMonth(date, 1) : moveDate(date, 1))}>Next {viewMode} →</button><SearchBox value={query} onChange={setQuery}/>{viewMode === 'day' ? <StatusFilter value={filter} onChange={setFilter} departmentValue={departmentFilter} onDepartmentChange={setDepartmentFilter} departments={departments}/> : <label className="dashboard-month-department">Department<select value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}><option value="all">All departments</option><option value="management">Management Board</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>}</section>
     {error && <p className="notice error">{error}</p>}
-    {loading ? <p className="loading">Loading data...</p> : !isWorkingDay ? <>
+    {viewMode === 'month' ? <MonthlyEmployeeTimeline month={date.slice(0, 7)} employees={employees} departments={departments} query={query} departmentFilter={departmentFilter}/> : loading ? <p className="loading">Loading data...</p> : !isWorkingDay ? <>
       <section className="dashboard-empty non-working-dashboard"><span>◌</span><h2>{nonWorkingMessage}</h2></section>
       {nonWorkingLeaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={nonWorkingLeaders} nonWorking/></div></section>}
       <section className="department-grid">{nonWorkingDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} nonWorking/>)}</section>
