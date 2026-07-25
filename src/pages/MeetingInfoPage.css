@@ -41,6 +41,19 @@
   padding-right: 5px;
 }
 
+.monthly-controls .meeting-view-toggle {
+  border-color: #c9d9e9;
+  background: #f7fbff;
+  color: #355a7c;
+}
+.monthly-controls .meeting-view-toggle.is-active {
+  border-color: #a9cce9;
+  background: #ddecfa;
+  color: #1f5f98;
+  font-weight: 750;
+  box-shadow: 0 5px 13px rgba(38, 105, 161, .18);
+}
+
 /* Content and time are deliberately prioritized for the meeting agenda. */
 .meeting-info-table {
   table-layout: fixed;
@@ -67,4 +80,111 @@
 .meeting-info-table td {
   overflow-wrap: anywhere;
   vertical-align: top;
+}
+
+.weekly-meeting-calendar {
+  display: grid;
+  gap: 22px;
+}
+.weekly-meeting-section {
+  overflow: visible;
+  border: 1px solid #dce6ee;
+  border-radius: 14px;
+  background: #fff;
+}
+.weekly-meeting-section > h2 {
+  margin: 0;
+  padding: 14px 16px;
+  color: #203d59;
+  font-size: 16px;
+  border-bottom: 1px solid #dce6ee;
+}
+.weekly-meeting-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(155px, 1fr));
+  min-width: 1085px;
+}
+.weekly-meeting-day {
+  min-height: 190px;
+  padding: 10px;
+  border-right: 1px solid #e3eaf0;
+  background: #fff;
+}
+.weekly-meeting-day:last-child {
+  border-right: 0;
+}
+.weekly-meeting-day > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  color: #36536f;
+  font-size: 13px;
+}
+.weekly-meeting-day > header span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #dcecfb;
+  color: #276294;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.weekly-meeting-items {
+  display: grid;
+  gap: 8px;
+}
+.weekly-meeting-card {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  border-radius: 8px;
+  background: #0c9db0;
+  color: #fff;
+  cursor: default;
+}
+.weekly-meeting-card > strong,
+.weekly-meeting-card > span,
+.weekly-meeting-card > small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.weekly-meeting-card > strong { font-size: 13px; }
+.weekly-meeting-card > span { font-size: 11px; }
+.weekly-meeting-card > small { font-size: 10px; font-weight: 700; opacity: .92; }
+.weekly-meeting-tooltip {
+  position: absolute;
+  z-index: 20;
+  left: 0;
+  display: none;
+  width: min(420px, calc(100vw - 32px));
+  max-height: min(70vh, 520px);
+  gap: 5px;
+  padding: 12px;
+  border-radius: 10px;
+  background: #193c5c;
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(20, 49, 73, .28);
+  font-size: 12px;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.is-current-week .weekly-meeting-tooltip {
+  top: calc(100% + 8px);
+}
+.is-next-week .weekly-meeting-tooltip {
+  bottom: calc(100% + 8px);
+}
+.weekly-meeting-tooltip span,
+.weekly-meeting-tooltip a { color: #e8f5ff; }
+.weekly-meeting-tooltip a { text-decoration: underline; }
+.weekly-meeting-card:hover .weekly-meeting-tooltip,
+.weekly-meeting-card:focus .weekly-meeting-tooltip { display: grid; }
+@media (max-width: 700px) {
+  .weekly-meeting-day { min-height: 165px; }
+  .weekly-meeting-section { border-radius: 10px; overflow-x: auto; }
 }

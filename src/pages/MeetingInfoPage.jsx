@@ -14,14 +14,30 @@ const timeRange = (meeting) =>
     ? `${meeting.start_time.slice(0, 5)} – ${meeting.end_time.slice(0, 5)}`
     : meeting.start_time?.slice(0, 5) || "Time not set";
 
+const timeRange12Hour = (meeting) => {
+  const format = (time) => time ? new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit", hour12: true }).format(new Date(`2000-01-01T${time.slice(0, 5)}:00`)) : "Time not set";
+  return meeting.start_time && meeting.end_time ? `${format(meeting.start_time)} - ${format(meeting.end_time)}` : format(meeting.start_time);
+};
+
 const moveDate = (date, delta) => {
   const value = new Date(`${date}T12:00:00`);
   value.setDate(value.getDate() + delta);
   return value.toISOString().slice(0, 10);
 };
 
+const startOfWeek = (date) => {
+  const value = new Date(`${date}T12:00:00`);
+  value.setDate(value.getDate() - ((value.getDay() + 6) % 7));
+  return value.toISOString().slice(0, 10);
+};
+
+const weekDates = (startDate) => Array.from({ length: 14 }, (_, index) => moveDate(startDate, index));
+const shortDay = (date) => new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${date}T12:00:00`));
+const weekHeading = (date) => `Week of ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${date}T12:00:00`))}`;
+
 export default function MeetingInfoPage({ profile, goBack }) {
   const [date, setDate] = useState(today());
+  const [viewMode, setViewMode] = useState("day");
   const [meetings, setMeetings] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -35,15 +51,12 @@ export default function MeetingInfoPage({ profile, goBack }) {
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
+    const meetingQuery = viewMode === "week"
+      ? supabase.from("employee_meetings").select("id,organizer_id,date,content,location,online_link,start_time,end_time").gte("date", startOfWeek(date)).lte("date", moveDate(startOfWeek(date), 13)).order("date").order("start_time")
+      : supabase.from("employee_meetings").select("id,organizer_id,date,content,location,online_link,start_time,end_time").eq("date", date).order("start_time");
     const [meetingResult, employeeResult, departmentResult] = await Promise.all(
       [
-        supabase
-          .from("employee_meetings")
-          .select(
-            "id,organizer_id,date,content,location,online_link,start_time,end_time",
-          )
-          .eq("date", date)
-          .order("start_time"),
+        meetingQuery,
         supabase
           .from("profiles")
           .select("id,full_name,employee_code,department_id")
@@ -77,7 +90,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
     setDepartments(departmentResult.data || []);
     setAttendees(attendeeResult.data || []);
     setLoading(false);
-  }, [date]);
+  }, [date, viewMode]);
 
   useEffect(() => {
     load();
@@ -182,27 +195,36 @@ export default function MeetingInfoPage({ profile, goBack }) {
         <div>
           <p className="eyebrow">EMPLOYEE MEETINGS</p>
           <h1>Meeting Info</h1>
-          <p className="subtle">{formatDate(date)}</p>
+          <p className="subtle">{viewMode === "week" ? `Two-week view · ${weekHeading(startOfWeek(date))}` : formatDate(date)}</p>
         </div>
         <button className="secondary-button" onClick={goBack}>
           ← Back to dashboard
         </button>
       </header>
       <section className="monthly-controls">
-        <button onClick={() => setDate(moveDate(date, -1))}>
-          ← Previous day
+        <button onClick={() => setDate(moveDate(date, viewMode === "week" ? -7 : -1))}>
+          ← Previous {viewMode === "week" ? "week" : "day"}
         </button>
         <input
           type="date"
           value={date}
           onChange={(event) => setDate(event.target.value)}
         />
-        <button onClick={() => setDate(moveDate(date, 1))}>Next day →</button>
-        <button onClick={() => setDate(today())}>Today</button>
+        <button onClick={() => setDate(moveDate(date, viewMode === "week" ? 7 : 1))}>Next {viewMode === "week" ? "week" : "day"} →</button>
+        <button className={`meeting-view-toggle ${viewMode === "day" ? "is-active" : ""}`} onClick={() => setViewMode("day")}>By day</button>
+        <button className={`meeting-view-toggle ${viewMode === "week" ? "is-active" : ""}`} onClick={() => setViewMode("week")}>By week</button>
       </section>
       {error && <p className="notice error">{error}</p>}
       {loading ? (
         <p className="loading">Loading meetings...</p>
+      ) : viewMode === "week" ? (
+        <WeeklyMeetingCalendar
+          startDate={startOfWeek(date)}
+          meetings={meetings}
+          attendees={attendees}
+          employeeById={employeeById}
+          departmentById={departmentById}
+        />
       ) : (
         <div className="monthly-table-wrap">
           <table className="monthly-table meeting-info-table">
@@ -374,6 +396,42 @@ export default function MeetingInfoPage({ profile, goBack }) {
       )}
     </main>
   );
+}
+
+function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById }) {
+  const meetingCardsByDate = useMemo(() => {
+    const attendeeIdsByMeeting = new Map();
+    attendees.forEach(({ meeting_id, employee_id }) => {
+      attendeeIdsByMeeting.set(meeting_id, [...(attendeeIdsByMeeting.get(meeting_id) || []), employee_id]);
+    });
+    const cards = new Map();
+    meetings.forEach(meeting => {
+      const participants = (attendeeIdsByMeeting.get(meeting.id) || []).map(id => employeeById.get(id)).filter(Boolean);
+      if (!participants.length) return;
+      const departmentNames = [...new Set(participants.map(person => departmentById.get(person.department_id)?.name || "Management Board"))];
+      const organizer = employeeById.get(meeting.organizer_id);
+      const card = { ...meeting, participants, departmentNames, organizer };
+      cards.set(meeting.date, [...(cards.get(meeting.date) || []), card]);
+    });
+    cards.forEach(items => items.sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || ""))));
+    return cards;
+  }, [meetings, attendees, employeeById, departmentById]);
+  const dates = weekDates(startDate);
+
+  return <section className="weekly-meeting-calendar" aria-label="Two-week meeting calendar">
+    {[dates.slice(0, 7), dates.slice(7)].map((week, index) => <section className={`weekly-meeting-section ${index === 0 ? "is-current-week" : "is-next-week"}`} key={week[0]}>
+      <h2>{index === 0 ? weekHeading(week[0]) : `Next week · ${weekHeading(week[0])}`}</h2>
+      <div className="weekly-meeting-grid">{week.map(day => <article className="weekly-meeting-day" key={day}>
+        <header><strong>{shortDay(day)}</strong>{day === today() && <span>Today</span>}</header>
+        <div className="weekly-meeting-items">{(meetingCardsByDate.get(day) || []).map(meeting => <article className="weekly-meeting-card" tabIndex="0" key={meeting.id}>
+          <strong>{meeting.content || "Meeting"}</strong>
+          <span>{timeRange(meeting)} · {meeting.location || "Location not specified"}</span>
+          <small>{meeting.departmentNames.join(" · ")}</small>
+          <div className="weekly-meeting-tooltip"><b>{meeting.content || "Meeting"}</b><span><strong>Time:</strong> {timeRange12Hour(meeting)}</span><span><strong>Location:</strong> {meeting.location || "Not specified"}</span><span><strong>Departments:</strong> {meeting.departmentNames.join(", ")}</span><span><strong>Participants:</strong> {meeting.participants.map(person => person.full_name).join(", ")}</span>{meeting.online_link && <a href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a>}</div>
+        </article>)}</div>
+      </article>)}</div>
+    </section>)}
+  </section>;
 }
 
 function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, onSaved }) {

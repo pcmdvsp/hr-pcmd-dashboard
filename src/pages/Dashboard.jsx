@@ -4,7 +4,6 @@ import './Dashboard.css'
 import DepartmentCard from '../components/DepartmentCard'
 import StatusFilter from '../components/StatusFilter'
 import SearchBox from '../components/SearchBox'
-import StatusForm from '../components/StatusForm'
 import StatusOverview from '../components/StatusOverview'
 import ResetPasswordDialog from '../components/ResetPasswordDialog'
 import MeetingNotifications from '../components/MeetingNotifications'
@@ -15,11 +14,10 @@ const formatHeaderTime = value => new Intl.DateTimeFormat('en-US', { hour: 'nume
 const nonWorkingLabel = day => ({ weekend: 'Weekend', holiday: 'Holiday', special_leave: 'Special leave' }[day.day_type] || 'Non-working day')
 
 export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly, goMeeting, goProduction, goUpdate, goCalendar, onDateChange }) {
-  const { employees, departments, calendarDay, isWorkingDay, loading, error, date, reload } = data
+  const { employees, departments, calendarDay, isWorkingDay, loading, error, date } = data
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
-  const [edit, setEdit] = useState(null)
   const [resetPassword, setResetPassword] = useState(false)
   const [now, setNow] = useState(() => new Date())
 
@@ -50,16 +48,15 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
     {error && <p className="notice error">{error}</p>}
     {loading ? <p className="loading">Loading data...</p> : !isWorkingDay ? <>
       <section className="dashboard-empty non-working-dashboard"><span>◌</span><h2>{nonWorkingMessage}</h2></section>
-      {nonWorkingLeaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={nonWorkingLeaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit} nonWorking/></div></section>}
-      <section className="department-grid">{nonWorkingDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} editable={profile.role === 'admin'} onEmployeeClick={setEdit} nonWorking/>)}</section>
+      {nonWorkingLeaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={nonWorkingLeaders} nonWorking/></div></section>}
+      <section className="department-grid">{nonWorkingDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} nonWorking/>)}</section>
       {nonWorkingEmployees.length === 0 && <p className="empty">No employees are working or on business trips.</p>}
     </> : <>
       <StatusOverview employees={dashboardEmployees}/>
-      {leaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={leaders} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/></div></section>}
-      <section className="department-grid">{visibleDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees} editable={profile.role === 'admin'} onEmployeeClick={setEdit}/>)}</section>
+      {leaders.length > 0 && <section className="leadership-section"><div className="leadership-list"><DepartmentCard department={{ name: 'Management Board' }} employees={leaders}/></div></section>}
+      <section className="department-grid">{visibleDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees}/>)}</section>
       {visible.length === 0 && <div className="dashboard-empty"><span>◌</span><p>No matching employees found.</p></div>}
     </>}
-    {edit && <div className="modal-backdrop"><div className="modal"><StatusForm employee={edit} initialDate={date} canEditHistory={profile.role === 'admin'} onSaved={reload} onClose={() => setEdit(null)}/></div></div>}
     {resetPassword && <ResetPasswordDialog employees={employees} onClose={() => setResetPassword(false)} />}
   </main>
 }
