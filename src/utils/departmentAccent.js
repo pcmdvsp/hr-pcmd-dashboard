@@ -5,7 +5,7 @@ const namedDepartmentAccents = {
   'block 09-2/09': '#087f8c',
   'block 09-2/10': '#d97706',
   'block 01/17 & 02/17': '#2f855a',
-  'block 16-1/15': '#b45309',
+  'block 16-1/15': '#7c2d12',
   'block 09-3/12': '#b83280',
 }
 
