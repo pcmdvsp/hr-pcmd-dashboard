@@ -1,8 +1,10 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Clock3, MapPin } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { formatDate, today } from "../utils/status";
 import { showRoomReservationAlert } from "../components/RoomReservationAlert";
 import { getUnavailableMeetingParticipants } from "../utils/meetingAvailability";
+import { departmentAccent } from "../utils/departmentAccent";
 import "./MeetingInfoPage.css";
 
 const KNT_MEETING_ROOM = "KNT meeting room";
@@ -37,7 +39,7 @@ const weekHeading = (date) => `Week of ${new Intl.DateTimeFormat("en-GB", { day:
 
 export default function MeetingInfoPage({ profile, goBack }) {
   const [date, setDate] = useState(today());
-  const [viewMode, setViewMode] = useState("day");
+  const [viewMode, setViewMode] = useState("week");
   const [meetings, setMeetings] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -251,7 +253,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
                 <Fragment key={group.name}>
                   <tr>
                     <td colSpan="6">
-                      <b>{group.name}</b>
+                      <b style={{ color: departmentAccent(group.name, group.sortOrder) }}>{group.name}</b>
                     </td>
                   </tr>
                   {group.items.map((meeting) => (
@@ -399,6 +401,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
 }
 
 function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById }) {
+  const [expandedDates, setExpandedDates] = useState(new Set());
   const meetingCardsByDate = useMemo(() => {
     const attendeeIdsByMeeting = new Map();
     attendees.forEach(({ meeting_id, employee_id }) => {
@@ -421,15 +424,23 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
   return <section className="weekly-meeting-calendar" aria-label="Two-week meeting calendar">
     {[dates.slice(0, 7), dates.slice(7)].map((week, index) => <section className={`weekly-meeting-section ${index === 0 ? "is-current-week" : "is-next-week"}`} key={week[0]}>
       <h2>{index === 0 ? weekHeading(week[0]) : `Next week · ${weekHeading(week[0])}`}</h2>
-      <div className="weekly-meeting-grid">{week.map(day => <article className="weekly-meeting-day" key={day}>
-        <header><strong>{shortDay(day)}</strong>{day === today() && <span>Today</span>}</header>
-        <div className="weekly-meeting-items">{(meetingCardsByDate.get(day) || []).map(meeting => <article className="weekly-meeting-card" tabIndex="0" key={meeting.id}>
-          <strong>{meeting.content || "Meeting"}</strong>
-          <span>{timeRange(meeting)} · {meeting.location || "Location not specified"}</span>
-          <small>{meeting.departmentNames.join(" · ")}</small>
-          <div className="weekly-meeting-tooltip"><b>{meeting.content || "Meeting"}</b><span><strong>Time:</strong> {timeRange12Hour(meeting)}</span><span><strong>Location:</strong> {meeting.location || "Not specified"}</span><span><strong>Departments:</strong> {meeting.departmentNames.join(", ")}</span><span><strong>Participants:</strong> {meeting.participants.map(person => person.full_name).join(", ")}</span>{meeting.online_link && <a href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a>}</div>
-        </article>)}</div>
-      </article>)}</div>
+      <div className="weekly-meeting-grid">{week.map(day => {
+        const dayMeetings = meetingCardsByDate.get(day) || [];
+        const isExpanded = expandedDates.has(day);
+        const visibleMeetings = isExpanded ? dayMeetings : dayMeetings.slice(0, 3);
+        const isWeekend = [0, 6].includes(new Date(`${day}T12:00:00`).getDay());
+        return <article className={`weekly-meeting-day ${day === today() ? "is-today" : ""} ${isWeekend ? "is-weekend" : ""}`} key={day}>
+          <header><strong>{shortDay(day)}</strong>{day === today() && <span>Today</span>}</header>
+          <div className="weekly-meeting-items">{visibleMeetings.map(meeting => <article className="weekly-meeting-card" tabIndex="0" key={meeting.id}>
+            <strong>{meeting.content || "Meeting"}</strong>
+            <span className="weekly-meeting-card-time"><Clock3 size={12} />{timeRange(meeting)}</span>
+            <span className="weekly-meeting-card-location"><MapPin size={12} />{meeting.location || "Location not specified"}</span>
+            <small className="weekly-meeting-departments">{meeting.departmentNames.map((name, index) => <span key={name} style={{ color: departmentAccent(name) }}>{index ? " · " : ""}{name}</span>)}</small>
+            <div className="weekly-meeting-tooltip"><b>{meeting.content || "Meeting"}</b><span><strong>Time:</strong> {timeRange12Hour(meeting)}</span><span><strong>Location:</strong> {meeting.location || "Not specified"}</span><span><strong>Departments:</strong> {meeting.departmentNames.join(", ")}</span><span><strong>Participants:</strong> {meeting.participants.map(person => person.full_name).join(", ")}</span>{meeting.online_link && <a href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a>}</div>
+          </article>)}</div>
+          {dayMeetings.length > 3 && <button className="weekly-meeting-more" type="button" onClick={() => setExpandedDates(current => { const next = new Set(current); isExpanded ? next.delete(day) : next.add(day); return next; })}>{isExpanded ? "Show less" : `+${dayMeetings.length - 3} more`}</button>}
+        </article>;
+      })}</div>
     </section>)}
   </section>;
 }

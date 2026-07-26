@@ -52,13 +52,13 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
       const status = record?.status === 'meeting' ? 'working' : record?.status || (calendarDay.day_type === 'working_day' ? 'working' : null)
       return { status, dayType: calendarDay.day_type, holidayName: calendarDay.holiday_name, isHoliday: calendarDay.day_type === 'holiday' || Boolean(calendarDay.holiday_name), date, isToday: date === today(), content: record?.content, location: record?.location, note: record?.note }
     })
-    return cells.reduce((segments, cell) => {
+    return cells.reduce((segments, cell, dayIndex) => {
       // Keep ordinary working days as individual blank cells. Explicit statuses
       // use their status alone so consecutive dates become one continuous bar.
-      const key = cell.status && cell.status !== 'working' ? `${cell.status}:${cell.isToday ? cell.date : ''}` : `${cell.status || 'off'}:${cell.dayType}:${cell.status === 'working' || cell.dayType === 'holiday' || cell.isToday ? cell.date : ''}`
+      const key = cell.status && cell.status !== 'working' ? cell.status : `${cell.status || 'off'}:${cell.dayType}:${cell.status === 'working' || cell.dayType === 'holiday' ? cell.date : ''}`
       const previous = segments.at(-1)
       if (previous?.key === key) previous.length += 1
-      else segments.push({ ...cell, key, length: 1 })
+      else segments.push({ ...cell, key, length: 1, start: dayIndex })
       return segments
     }, [])
   }
@@ -74,7 +74,7 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
     <header><div><p className="eyebrow">MONTHLY EMPLOYEE OVERVIEW</p><h2>{monthTitle(month)}</h2></div><p>{shownEmployees.length} employees · {days.length} days</p></header>
     <div className="monthly-timeline-wrap"><table className="monthly-timeline-table">
       <thead><tr><th className="timeline-employee-header">Employee</th>{days.map(date => { const calendarDay = calendarByDate.get(date); return <th className={`${date === today() ? 'is-today' : ''} ${calendarDay?.day_type === 'holiday' || calendarDay?.holiday_name ? 'is-holiday' : ''}`} key={date}><small>{shortWeekday(date)}</small><b>{date.slice(-2)}</b></th> })}</tr></thead>
-      <tbody>{groups.map(group => <FragmentGroup key={group.id} group={group} days={days} segmentsFor={segmentsFor} collapsed={collapsedGroups.has(group.id)} onToggle={toggleGroup}/>)}</tbody>
+      <tbody>{groups.map(group => <TimelineGroup key={group.id} group={group} days={days} segmentsFor={segmentsFor} collapsed={collapsedGroups.has(group.id)} onToggle={toggleGroup}/>)}</tbody>
     </table></div>
     {!groups.length && <p className="empty">No matching employees found.</p>}
     <footer>{Object.entries(STATUS).filter(([key]) => key !== 'meeting').map(([key, item]) => <span key={key}><i className={key === 'working' ? 'timeline-working' : ''} style={key === 'working' ? undefined : { background: item.color }}/>{item.label} <b>{summaryCounts[key] || 0}</b></span>)}<span><i className="timeline-off"/>Weekend / holiday</span></footer>
@@ -87,4 +87,19 @@ const timelineTooltip = segment => segment.status === 'business_trip'
 
 function FragmentGroup({ group, days, segmentsFor, collapsed, onToggle }) {
   return <><tr className="timeline-group"><th colSpan={days.length + 1}><button type="button" onClick={() => onToggle(group.id)} aria-expanded={!collapsed}><i>{collapsed ? '›' : '⌄'}</i>{group.name} <span>{group.employees.length}</span></button></th></tr>{!collapsed && group.employees.map(employee => <tr key={employee.id}><th className="timeline-employee"><b>{employee.full_name}</b><small>{employee.employee_code}</small></th>{segmentsFor(employee).map((segment, index) => <td key={index} colSpan={segment.length} title={timelineTooltip(segment)} className={`timeline-cell ${segment.status ? `is-${segment.status}` : 'is-off'} ${segment.isHoliday ? 'is-calendar-holiday' : ''} ${segment.isToday ? 'is-today' : ''} ${segment.length === 1 ? 'is-single' : ''} ${segment.dayType}`}><span /></td>)}</tr>)}</>
+}
+
+function TimelineGroup({ group, days, segmentsFor, collapsed, onToggle }) {
+  const todayIndex = days.indexOf(today())
+  return <>
+    <tr className="timeline-group"><th colSpan={days.length + 1}><button type="button" onClick={() => onToggle(group.id)} aria-expanded={!collapsed}><i>{collapsed ? '>' : 'v'}</i>{group.name} <span>{group.employees.length}</span></button></th></tr>
+    {!collapsed && group.employees.map(employee => <tr key={employee.id}>
+      <th className="timeline-employee"><b>{employee.full_name}</b><small>{employee.employee_code}</small></th>
+      {segmentsFor(employee).map((segment, index) => {
+        const containsToday = todayIndex >= segment.start && todayIndex < segment.start + segment.length
+        const todayPosition = containsToday ? `${((todayIndex - segment.start + 0.5) / segment.length) * 100}%` : undefined
+        return <td key={index} colSpan={segment.length} title={timelineTooltip(segment)} style={todayPosition ? { '--today-position': todayPosition } : undefined} className={`timeline-cell ${segment.status ? `is-${segment.status}` : 'is-off'} ${segment.isHoliday ? 'is-calendar-holiday' : ''} ${containsToday ? 'is-today' : ''} ${segment.length === 1 ? 'is-single' : ''} ${segment.dayType}`}><span /></td>
+      })}
+    </tr>)}
+  </>
 }

@@ -105,11 +105,17 @@
   min-width: 1085px;
 }
 .weekly-meeting-day {
-  min-height: 190px;
+  min-height: 132px;
   padding: 10px;
   border-right: 1px solid #e3eaf0;
   background: #fff;
 }
+.weekly-meeting-day.is-weekend { background: #f6f8fa; }
+.weekly-meeting-day.is-today {
+  background: #fff;
+  box-shadow: inset 0 0 0 2px #c9b9df;
+}
+.weekly-meeting-day.is-today.is-weekend { background: #f6f8fa; }
 .weekly-meeting-day:last-child {
   border-right: 0;
 }
@@ -131,6 +137,7 @@
   font-weight: 800;
   text-transform: uppercase;
 }
+.weekly-meeting-day.is-today > header strong { color: #164f7c; font-weight: 800; }
 .weekly-meeting-items {
   display: grid;
   gap: 8px;
@@ -138,13 +145,18 @@
 .weekly-meeting-card {
   position: relative;
   display: grid;
-  gap: 3px;
+  gap: 4px;
   padding: 9px;
-  border-radius: 8px;
-  background: #0c9db0;
-  color: #fff;
+  border-radius: 10px;
+  border: 1px solid #c4dced;
+  background: #dceef9;
+  color: #174f78;
   cursor: default;
+  box-shadow: 0 2px 6px rgba(34, 91, 133, .14);
+  transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
 }
+.weekly-meeting-card:hover,
+.weekly-meeting-card:focus { z-index: 30; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(34, 91, 133, .25); filter: brightness(1.03); outline: none; }
 .weekly-meeting-card > strong,
 .weekly-meeting-card > span,
 .weekly-meeting-card > small {
@@ -154,10 +166,31 @@
 }
 .weekly-meeting-card > strong { font-size: 13px; }
 .weekly-meeting-card > span { font-size: 11px; }
-.weekly-meeting-card > small { font-size: 10px; font-weight: 700; opacity: .92; }
+.weekly-meeting-card-time,
+.weekly-meeting-card-location { display: flex !important; align-items: center; gap: 4px; font-weight: 650; }
+.weekly-meeting-card-time svg,
+.weekly-meeting-card-location svg { flex: 0 0 auto; }
+.weekly-meeting-card-time svg { color: #7357a6; }
+.weekly-meeting-card-location svg { color: #d97745; }
+.weekly-meeting-card-location { color: #2f668d; }
+.weekly-meeting-card > small { color: #356f98; font-size: 10px; font-weight: 700; }
+.weekly-meeting-more {
+  width: 100%;
+  margin-top: 8px;
+  padding: 5px 7px;
+  border: 1px dashed #9fc4dc;
+  border-radius: 8px;
+  background: #f7fbff;
+  color: #266897;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
+.weekly-meeting-more:hover { background: #e7f3fc; }
 .weekly-meeting-tooltip {
   position: absolute;
-  z-index: 20;
+  z-index: 40;
   left: 0;
   display: none;
   width: min(420px, calc(100vw - 32px));
@@ -185,6 +218,6 @@
 .weekly-meeting-card:hover .weekly-meeting-tooltip,
 .weekly-meeting-card:focus .weekly-meeting-tooltip { display: grid; }
 @media (max-width: 700px) {
-  .weekly-meeting-day { min-height: 165px; }
+  .weekly-meeting-day { min-height: 132px; }
   .weekly-meeting-section { border-radius: 10px; overflow-x: auto; }
 }

@@ -148,10 +148,12 @@
 
 .toolbar .status-filter {
   gap: 5px;
-  flex: 0 0 auto;
+  flex: 1 1 0;
   flex-wrap: nowrap;
 }
 .toolbar .status-filter-options {
+  flex: 1 1 0;
+  justify-content: space-between;
   overflow: visible;
 }
 .toolbar .status-filter button {
@@ -167,9 +169,22 @@
 }
 
 .department-card {
-  border-top-width: 3px;
+  border-top-width: 4px;
   border-radius: 13px;
   box-shadow: 0 5px 14px #263d5a0d;
+  transition: transform .16s ease, box-shadow .16s ease;
+}
+
+.department-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px rgba(38, 61, 90, .14);
+}
+
+.department-card:hover header {
+  margin-inline: -2px;
+  padding-inline: 2px;
+  border-radius: 7px;
+  background: #f7faff;
 }
 
 .department-card header {
@@ -316,4 +331,61 @@
 .dashboard-previous-period { width: 149px; }
 .dashboard-period-button:hover { background: #f4f8fc; }
 .dashboard-period-input { width: 174px; padding: 7px 9px; }
+.dashboard-period-controls,
+.dashboard-filter-controls { display: contents; }
 .toolbar > :not(.dashboard-view-toggle) { order: 1; }
+
+@media (max-width: 640px) {
+  .toolbar { gap: 10px; }
+  .dashboard-period-controls {
+    display: flex;
+    order: 1;
+    flex: 0 0 100%;
+    width: 100%;
+    gap: 7px;
+  }
+  .dashboard-period-controls .dashboard-period-button,
+  .dashboard-period-controls .dashboard-previous-period {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    padding-inline: 5px;
+    font-size: 12px;
+  }
+  .dashboard-period-controls .dashboard-period-input {
+    flex: 1.2 1 0;
+    width: auto;
+    min-width: 0;
+    font-size: 12px;
+  }
+  .dashboard-filter-controls {
+    display: flex;
+    order: 2;
+    flex: 0 0 100%;
+    width: 100%;
+    min-width: 0;
+    gap: 7px;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+  .dashboard-filter-controls .search-box {
+    flex: 0 0 178px;
+    width: 178px;
+  }
+  .dashboard-filter-controls .status-filter {
+    flex: 0 0 max-content;
+    width: max-content;
+    flex-direction: row;
+    align-items: center;
+  }
+  .dashboard-filter-controls .department-filter {
+    flex: 0 0 150px;
+    width: 150px;
+  }
+  .dashboard-filter-controls .status-filter-options {
+    width: max-content;
+    overflow: visible;
+  }
+  .dashboard-filter-controls .dashboard-month-department { flex: 0 0 170px; }
+  .dashboard-view-toggle { order: 3; }
+}

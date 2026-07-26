@@ -27,8 +27,7 @@
 .timeline-cell.weekend, .timeline-cell.special_leave, .timeline-cell.is-off { background: #f7f8fa; }
 .monthly-timeline-table td.timeline-cell.holiday,
 .monthly-timeline-table td.timeline-cell.is-calendar-holiday { background: #fde5ed !important; }
-.timeline-cell.is-today { background-color: #f2faff; }
-.timeline-cell.is-today::after { content: ''; position: absolute; z-index: 2; top: 0; bottom: 0; left: 50%; width: 1px; background: #c4b5fd; opacity: .7; pointer-events: none; transform: translateX(-50%); }
+.timeline-cell.is-today::after { content: ''; position: absolute; z-index: 2; top: 0; bottom: 0; left: var(--today-position); width: 1px; background: #c4b5fd; opacity: .7; pointer-events: none; transform: translateX(-50%); }
 .timeline-cell span { display: block; width: 100%; height: 100%; min-height: 21px; border-radius: 999px; }
 .timeline-cell.is-working span {
   display: none;
@@ -38,8 +37,8 @@
 .timeline-cell.is-leave span { background: #3498db; }
 .timeline-cell.is-sick span { background: #e74c3c; }
 .timeline-cell.is-single span { width: 18px; margin-inline: auto; border-radius: 50%; }
-.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell { background: #eef5fb; }
-.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee { background: #dceefd; box-shadow: inset 4px 0 0 #2f80c4; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell { background: #f7f5fb; }
+.monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee { background: #eeeaf7; box-shadow: inset 4px 0 0 #8b73b3; }
 .monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee b { color: #064f86; font-weight: 800; text-shadow: 0 1px 0 rgba(255, 255, 255, .9); }
 .monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee small { color: #256c9e; font-weight: 700; }
 .monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell span { filter: brightness(1.22) saturate(1.15); box-shadow: 0 2px 5px rgba(41, 89, 128, .18); }
