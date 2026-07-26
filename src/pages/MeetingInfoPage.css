@@ -101,8 +101,8 @@
 }
 .weekly-meeting-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(155px, 1fr));
-  min-width: 1085px;
+  grid-template-columns: repeat(5, minmax(155px, 1fr)) repeat(2, minmax(116px, .75fr));
+  min-width: 1007px;
 }
 .weekly-meeting-day {
   min-height: 132px;
@@ -264,4 +264,9 @@
 @media (max-width: 700px) {
   .weekly-meeting-day { min-height: 132px; }
   .weekly-meeting-section { border-radius: 10px; overflow-x: auto; }
+  .weekly-meeting-section.is-next-week {
+    max-height: 68vh;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
