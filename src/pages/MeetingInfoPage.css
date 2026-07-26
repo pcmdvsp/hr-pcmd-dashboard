@@ -147,13 +147,57 @@
   display: grid;
   gap: 4px;
   padding: 9px;
-  border-radius: 10px;
+  border-radius: 13px;
   border: 1px solid #c4dced;
   background: #dceef9;
   color: #174f78;
   cursor: default;
   box-shadow: 0 2px 6px rgba(34, 91, 133, .14);
   transition: transform .16s ease, box-shadow .16s ease, filter .16s ease;
+}
+.meeting-department-filter {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: auto;
+  color: #4c6680;
+  font-size: 13px;
+  font-weight: 700;
+}
+.meeting-department-filter select { min-width: 185px; }
+.meeting-date-controls { display: contents; }
+@media (max-width: 700px) {
+  .meeting-page .monthly-controls { overflow: visible; }
+  .meeting-page .monthly-controls .meeting-date-controls {
+    display: flex;
+    flex: 0 0 100%;
+    width: 100%;
+    gap: 6px;
+  }
+  .meeting-page .monthly-controls .meeting-date-controls button,
+  .meeting-page .monthly-controls .meeting-date-controls input {
+    min-width: 0;
+    min-height: 38px;
+    padding: 7px 5px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .meeting-page .monthly-controls .meeting-date-controls button { flex: 1 1 0; }
+  .meeting-page .monthly-controls .meeting-date-controls input { flex: 1.25 1 0; }
+  .meeting-department-filter { margin-left: 0; }
+}
+.weekly-meeting-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 13px;
+  border-radius: 13px 13px 0 0;
+  background: var(--department-border, #c4dced);
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat;
+  mask: linear-gradient(#000 0 0) top / 100% 4px no-repeat;
+  pointer-events: none;
 }
 .weekly-meeting-card:hover,
 .weekly-meeting-card:focus { z-index: 30; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(34, 91, 133, .25); filter: brightness(1.03); outline: none; }

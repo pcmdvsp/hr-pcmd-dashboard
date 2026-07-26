@@ -9,6 +9,7 @@
 .monthly-timeline-table thead th small, .monthly-timeline-table thead th b { display: block; line-height: 1.1; }
 .monthly-timeline-table thead th small { font-size: 9px; font-weight: 600; text-transform: uppercase; }
 .monthly-timeline-table thead th b { margin-top: 3px; font-size: 13px; }
+.monthly-timeline-table thead th.is-weekend { background: #f7f8fa; }
 .monthly-timeline-table thead th.is-holiday { background: #fde5ed; }
 .monthly-timeline-table thead th.is-today { background: #eaf6ff; box-shadow: none; }
 .monthly-timeline-table thead th.is-holiday.is-today { background: #eaf6ff; }

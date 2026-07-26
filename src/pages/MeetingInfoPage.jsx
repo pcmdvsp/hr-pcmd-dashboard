@@ -36,10 +36,15 @@ const startOfWeek = (date) => {
 const weekDates = (startDate) => Array.from({ length: 14 }, (_, index) => moveDate(startDate, index));
 const shortDay = (date) => new Intl.DateTimeFormat("en-GB", { weekday: "short", day: "numeric", month: "short" }).format(new Date(`${date}T12:00:00`));
 const weekHeading = (date) => `Week of ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" }).format(new Date(`${date}T12:00:00`))}`;
+const departmentBorder = (names) => {
+  const colors = names.map(departmentAccent);
+  return `linear-gradient(90deg, ${colors.map((color, index) => `${color} ${(index / colors.length) * 100}% ${((index + 1) / colors.length) * 100}%`).join(", ")})`;
+};
 
 export default function MeetingInfoPage({ profile, goBack }) {
   const [date, setDate] = useState(today());
   const [viewMode, setViewMode] = useState("week");
+  const [departmentFilter, setDepartmentFilter] = useState("all");
   const [meetings, setMeetings] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -204,7 +209,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
         </button>
       </header>
       <section className="monthly-controls">
-        <button onClick={() => setDate(moveDate(date, viewMode === "week" ? -7 : -1))}>
+        <div className="meeting-date-controls"><button onClick={() => setDate(moveDate(date, viewMode === "week" ? -7 : -1))}>
           ← Previous {viewMode === "week" ? "week" : "day"}
         </button>
         <input
@@ -212,9 +217,10 @@ export default function MeetingInfoPage({ profile, goBack }) {
           value={date}
           onChange={(event) => setDate(event.target.value)}
         />
-        <button onClick={() => setDate(moveDate(date, viewMode === "week" ? 7 : 1))}>Next {viewMode === "week" ? "week" : "day"} →</button>
+        <button onClick={() => setDate(moveDate(date, viewMode === "week" ? 7 : 1))}>Next {viewMode === "week" ? "week" : "day"} →</button></div>
         <button className={`meeting-view-toggle ${viewMode === "day" ? "is-active" : ""}`} onClick={() => setViewMode("day")}>By day</button>
         <button className={`meeting-view-toggle ${viewMode === "week" ? "is-active" : ""}`} onClick={() => setViewMode("week")}>By week</button>
+        {viewMode === "week" && <label className="meeting-department-filter">Department<select value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}><option value="all">All departments</option><option value="management">Management Board</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>}
       </section>
       {error && <p className="notice error">{error}</p>}
       {loading ? (
@@ -226,6 +232,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
           attendees={attendees}
           employeeById={employeeById}
           departmentById={departmentById}
+          departmentFilter={departmentFilter}
         />
       ) : (
         <div className="monthly-table-wrap">
@@ -400,7 +407,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   );
 }
 
-function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById }) {
+function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById, departmentFilter }) {
   const [expandedDates, setExpandedDates] = useState(new Set());
   const meetingCardsByDate = useMemo(() => {
     const attendeeIdsByMeeting = new Map();
@@ -411,6 +418,8 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
     meetings.forEach(meeting => {
       const participants = (attendeeIdsByMeeting.get(meeting.id) || []).map(id => employeeById.get(id)).filter(Boolean);
       if (!participants.length) return;
+      const matchesDepartment = departmentFilter === "all" || participants.some(person => departmentFilter === "management" ? !person.department_id : person.department_id === departmentFilter);
+      if (!matchesDepartment) return;
       const departmentNames = [...new Set(participants.map(person => departmentById.get(person.department_id)?.name || "Management Board"))];
       const organizer = employeeById.get(meeting.organizer_id);
       const card = { ...meeting, participants, departmentNames, organizer };
@@ -418,7 +427,7 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
     });
     cards.forEach(items => items.sort((a, b) => String(a.start_time || "").localeCompare(String(b.start_time || ""))));
     return cards;
-  }, [meetings, attendees, employeeById, departmentById]);
+  }, [meetings, attendees, employeeById, departmentById, departmentFilter]);
   const dates = weekDates(startDate);
 
   return <section className="weekly-meeting-calendar" aria-label="Two-week meeting calendar">
@@ -431,7 +440,7 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
         const isWeekend = [0, 6].includes(new Date(`${day}T12:00:00`).getDay());
         return <article className={`weekly-meeting-day ${day === today() ? "is-today" : ""} ${isWeekend ? "is-weekend" : ""}`} key={day}>
           <header><strong>{shortDay(day)}</strong>{day === today() && <span>Today</span>}</header>
-          <div className="weekly-meeting-items">{visibleMeetings.map(meeting => <article className="weekly-meeting-card" tabIndex="0" key={meeting.id}>
+          <div className="weekly-meeting-items">{visibleMeetings.map(meeting => <article className="weekly-meeting-card" style={{ "--department-border": departmentBorder(meeting.departmentNames) }} tabIndex="0" key={meeting.id}>
             <strong>{meeting.content || "Meeting"}</strong>
             <span className="weekly-meeting-card-time"><Clock3 size={12} />{timeRange(meeting)}</span>
             <span className="weekly-meeting-card-location"><MapPin size={12} />{meeting.location || "Location not specified"}</span>

@@ -73,7 +73,7 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
   return <section className="monthly-timeline-panel">
     <header><div><p className="eyebrow">MONTHLY EMPLOYEE OVERVIEW</p><h2>{monthTitle(month)}</h2></div><p>{shownEmployees.length} employees · {days.length} days</p></header>
     <div className="monthly-timeline-wrap"><table className="monthly-timeline-table">
-      <thead><tr><th className="timeline-employee-header">Employee</th>{days.map(date => { const calendarDay = calendarByDate.get(date); return <th className={`${date === today() ? 'is-today' : ''} ${calendarDay?.day_type === 'holiday' || calendarDay?.holiday_name ? 'is-holiday' : ''}`} key={date}><small>{shortWeekday(date)}</small><b>{date.slice(-2)}</b></th> })}</tr></thead>
+      <thead><tr><th className="timeline-employee-header">Employee</th>{days.map(date => { const calendarDay = calendarByDate.get(date) || { day_type: fallbackDayType(date) }; return <th className={`${date === today() ? 'is-today' : ''} ${calendarDay.day_type === 'weekend' ? 'is-weekend' : ''} ${calendarDay.day_type === 'holiday' || calendarDay.holiday_name ? 'is-holiday' : ''}`} key={date}><small>{shortWeekday(date)}</small><b>{date.slice(-2)}</b></th> })}</tr></thead>
       <tbody>{groups.map(group => <TimelineGroup key={group.id} group={group} days={days} segmentsFor={segmentsFor} collapsed={collapsedGroups.has(group.id)} onToggle={toggleGroup}/>)}</tbody>
     </table></div>
     {!groups.length && <p className="empty">No matching employees found.</p>}
@@ -83,6 +83,8 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
 
 const timelineTooltip = segment => segment.status === 'business_trip'
   ? ['Business trip', segment.content || 'Content not specified', segment.location || 'Location not specified'].join('\n')
+  : segment.status === 'leave'
+    ? ['Annual leave', `Location: ${segment.location || segment.note || 'Not specified'}`].join('\n')
   : segment.status ? STATUS[segment.status]?.label : segment.dayType === 'holiday' ? (segment.holidayName || 'Holiday') : segment.dayType === 'weekend' ? 'Weekend' : segment.dayType === 'special_leave' ? (segment.holidayName || 'Special leave') : 'Non-working day'
 
 function FragmentGroup({ group, days, segmentsFor, collapsed, onToggle }) {
