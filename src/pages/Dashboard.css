@@ -335,6 +335,13 @@
 .dashboard-filter-controls { display: contents; }
 .toolbar > :not(.dashboard-view-toggle) { order: 1; }
 
+/* At enlarged desktop zoom the filter group needs its own line; keeping all
+   buttons on the first row would push Annual leave/Sick leave outside the page. */
+@media (max-width: 1250px) and (min-width: 641px) {
+  .toolbar .status-filter { flex: 1 1 100%; width: 100%; }
+  .toolbar .status-filter-options { min-width: 0; overflow-x: auto; }
+}
+
 @media (max-width: 640px) {
   .toolbar { gap: 10px; }
   .dashboard-period-controls {

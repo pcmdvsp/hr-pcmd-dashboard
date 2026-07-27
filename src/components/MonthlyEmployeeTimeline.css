@@ -16,8 +16,13 @@
 .monthly-timeline-table .timeline-employee-header, .monthly-timeline-table .timeline-employee { position: sticky; left: 0; z-index: 2; width: 195px; min-width: 195px; text-align: left; }
 .monthly-timeline-table .timeline-employee-header { z-index: 4; padding-left: 12px; background: #edf3f8; }
 .monthly-timeline-table .timeline-employee { padding: 5px 11px; background: #fff; color: #203d59; }
+.monthly-timeline-table tbody tr:not(.timeline-group) > th,
+.monthly-timeline-table tbody tr:not(.timeline-group) > td { height: 27px; }
+.monthly-timeline-table tbody .timeline-employee { padding-block: 2px; }
+.monthly-timeline-table tbody .timeline-cell { padding-block: 2px; }
+.monthly-timeline-table tbody .timeline-cell span { min-height: 15px; }
 .timeline-employee b, .timeline-employee small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.timeline-employee b { font-size: 12px; }
+.timeline-employee b { font-size: 12px; font-weight: 500; }
 .timeline-employee small { margin-top: 2px; color: #7b8ca0; font-size: 10px; font-weight: 500; }
 .timeline-group th { position: sticky; left: 0; z-index: 1; height: 30px; padding: 0; border-right: 0; border-left: 4px solid var(--department-accent, #2e6fae); background: #dce8f3; color: #284d70; text-align: left; font-size: 12px; }
 .timeline-group button { display: flex; align-items: center; width: 100%; height: 30px; gap: 7px; padding: 7px 12px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 750; text-align: left; cursor: pointer; }

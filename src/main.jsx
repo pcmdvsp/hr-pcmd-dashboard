@@ -76,6 +76,8 @@ function App() {
   };
   if (location.pathname === "/update")
     return <UpdateStatusPage profile={profile} goBack={returnToDashboard} />;
+  if (location.pathname === "/meeting-info")
+    return <MeetingInfoPage profile={profile} goBack={returnToDashboard} />;
   const signout = () => supabase.auth.signOut();
   if (page === "monthly")
     return <MonthlyStatsPage profile={profile} goBack={returnToDashboard} />;
@@ -86,7 +88,7 @@ function App() {
   if (page === "calendar" && profile.role === "admin")
     return <WorkCalendarPage goBack={returnToDashboard} />;
   return page === "admin" && profile.role === "admin" ? (
-    <AdminPage data={data} goBack={returnToDashboard} />
+    <AdminPage data={data} profile={profile} goBack={returnToDashboard} />
   ) : (
     <Dashboard
       profile={profile}

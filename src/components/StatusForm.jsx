@@ -4,6 +4,7 @@ import { STATUS, today } from '../utils/status'
 import { getUnavailableMeetingParticipants } from '../utils/meetingAvailability'
 import { showRoomReservationAlert } from './RoomReservationAlert'
 import { showSuccessAlert } from './SuccessAlert'
+import { notifyMeetingPush } from '../utils/pushNotifications'
 import './OvertimeConfirmDialog.css'
 
 const KNT_MEETING_ROOM = 'KNT meeting room'
@@ -163,6 +164,7 @@ export default function StatusForm({ employee, onSaved, onClose, initialDate = t
         const attendeeResult = await supabase.from('employee_meeting_attendees').insert(meetingIds.flatMap(meetingId => availableSelectedIds.map(employeeId => ({ meeting_id: meetingId, employee_id: employeeId }))))
         if (attendeeResult.error) { setSaving(false); return setError(attendeeResult.error.message) }
       }
+      await Promise.all(meetingIds.map(meetingId => notifyMeetingPush(meetingId, 'created').catch(error => console.error('Unable to send meeting push notification:', error.message))))
     } else {
       if (status !== 'working') {
         const meetingsResult = await supabase.from('employee_meetings').select('id').in('date', dates)

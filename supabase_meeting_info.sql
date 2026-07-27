@@ -212,3 +212,33 @@ insert into public.employee_meeting_attendees(meeting_id, employee_id, created_a
 select a.daily_status_id, a.employee_id, a.created_at from public.daily_status_attendees a join public.daily_status s on s.id = a.daily_status_id where s.status = 'meeting'
 on conflict do nothing;
 delete from public.daily_status where status = 'meeting';
+
+-- Prevents duplicate 15-minute push reminders when the scheduler runs every 5 minutes.
+create table if not exists public.meeting_push_deliveries (
+  id uuid primary key default gen_random_uuid(),
+  meeting_id uuid not null,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  kind text not null check (kind in ('reminder_15')),
+  delivered_at timestamptz not null default now(),
+  unique (meeting_id, recipient_id, kind)
+);
+alter table public.meeting_push_deliveries enable row level security;
+
+-- Stores a recipient's one-time reminder actions. This is accessed only by
+-- Edge Functions: the opaque token lets a Service Worker snooze or stop a
+-- reminder without exposing a user session or a privileged database key.
+create table if not exists public.meeting_reminder_preferences (
+  meeting_id uuid not null references public.employee_meetings(id) on delete cascade,
+  recipient_id uuid not null references public.profiles(id) on delete cascade,
+  action_token uuid not null default gen_random_uuid(),
+  snoozed_until timestamptz,
+  stopped_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (meeting_id, recipient_id),
+  unique (action_token)
+);
+create index if not exists meeting_reminder_preferences_snooze_idx
+  on public.meeting_reminder_preferences(snoozed_until)
+  where snoozed_until is not null and stopped_at is null;
+alter table public.meeting_reminder_preferences enable row level security;

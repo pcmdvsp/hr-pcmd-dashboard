@@ -5,6 +5,7 @@ import { formatDate, today } from "../utils/status";
 import { showRoomReservationAlert } from "../components/RoomReservationAlert";
 import { getUnavailableMeetingParticipants } from "../utils/meetingAvailability";
 import { departmentAccent } from "../utils/departmentAccent";
+import { notifyMeetingPush } from "../utils/pushNotifications";
 import "./MeetingInfoPage.css";
 
 const KNT_MEETING_ROOM = "KNT meeting room";
@@ -183,6 +184,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
       if (notificationResult.error)
         return setError(notificationResult.error.message);
     }
+    try { await notifyMeetingPush(meeting.id, "cancelled"); }
+    catch (pushError) { console.error("Unable to send meeting cancellation push notification:", pushError.message); }
     const attendeesResult = await supabase
       .from("employee_meeting_attendees")
       .delete()
@@ -233,6 +236,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
           employeeById={employeeById}
           departmentById={departmentById}
           departmentFilter={departmentFilter}
+          canEdit={canEdit}
+          onEdit={setActionMeeting}
         />
       ) : (
         <div className="monthly-table-wrap">
@@ -407,7 +412,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   );
 }
 
-function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById, departmentFilter }) {
+function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, departmentById, departmentFilter, canEdit, onEdit }) {
   const [expandedDates, setExpandedDates] = useState(new Set());
   const meetingCardsByDate = useMemo(() => {
     const attendeeIdsByMeeting = new Map();
@@ -445,7 +450,7 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
             <span className="weekly-meeting-card-time"><Clock3 size={12} />{timeRange(meeting)}</span>
             <span className="weekly-meeting-card-location"><MapPin size={12} />{meeting.location || "Location not specified"}</span>
             <small className="weekly-meeting-departments">{meeting.departmentNames.map((name, index) => <span key={name} style={{ color: departmentAccent(name) }}>{index ? " · " : ""}{name}</span>)}</small>
-            <div className="weekly-meeting-tooltip"><b>{meeting.content || "Meeting"}</b><span><strong>Time:</strong> {timeRange12Hour(meeting)}</span><span><strong>Location:</strong> {meeting.location || "Not specified"}</span><span><strong>Departments:</strong> {meeting.departmentNames.join(", ")}</span><span><strong>Participants:</strong> {meeting.participants.map(person => person.full_name).join(", ")}</span>{meeting.online_link && <a href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a>}</div>
+            <div className="weekly-meeting-tooltip"><b>{meeting.content || "Meeting"}</b><span><strong>Time:</strong> {timeRange12Hour(meeting)}</span><span><strong>Location:</strong> {meeting.location || "Not specified"}</span><span><strong>Departments:</strong> {meeting.departmentNames.join(", ")}</span><span><strong>Participants:</strong> {meeting.participants.map(person => person.full_name).join(", ")}</span>{(meeting.online_link || canEdit(meeting)) && <div className="weekly-meeting-tooltip-actions">{meeting.online_link && <a className="weekly-meeting-online" href={meeting.online_link} target="_blank" rel="noreferrer">Go online</a>}{canEdit(meeting) && <button type="button" className="weekly-meeting-edit" onClick={event => { event.preventDefault(); event.stopPropagation(); onEdit(meeting); }}>Edit meeting</button>}</div>}</div>
           </article>)}</div>
           {dayMeetings.length > 3 && <button className="weekly-meeting-more" type="button" onClick={() => setExpandedDates(current => { const next = new Set(current); isExpanded ? next.delete(day) : next.add(day); return next; })}>{isExpanded ? "Show less" : `+${dayMeetings.length - 3} more`}</button>}
         </article>;
@@ -455,6 +460,7 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
 }
 
 function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, onSaved }) {
+  const [meetingDate, setMeetingDate] = useState(meeting.date || "");
   const [content, setContent] = useState(meeting.content || "");
   const [location, setLocation] = useState(meeting.location || "");
   const [onlineLink, setOnlineLink] = useState(meeting.online_link || "");
@@ -472,13 +478,17 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
     if (error === ROOM_MESSAGE) showRoomReservationAlert(ROOM_MESSAGE);
   }, [error]);
   useEffect(() => {
-    getUnavailableMeetingParticipants([meeting.date]).then(
+    if (!meetingDate) {
+      setUnavailable(new Map());
+      return;
+    }
+    getUnavailableMeetingParticipants([meetingDate]).then(
       (nextUnavailable) => {
         setUnavailable(nextUnavailable);
         setSelectedIds((ids) => ids.filter((id) => !nextUnavailable.has(id)));
       },
     );
-  }, [meeting.date]);
+  }, [meetingDate]);
   const results = useMemo(() => {
     const text = query.trim().toLowerCase();
     return text
@@ -520,6 +530,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
 
   const submit = async (event) => {
     event.preventDefault();
+    if (!meetingDate) return setError("A meeting date is required.");
     if (!content.trim() || !location.trim())
       return setError("Content and location are required.");
     if (!startTime || !endTime)
@@ -529,7 +540,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
     setSaving(true);
     setError("");
     const currentUnavailable = await getUnavailableMeetingParticipants([
-      meeting.date,
+      meetingDate,
     ]);
     const availableSelectedIds = [
       ...new Set(selectedIds.filter((id) => !currentUnavailable.has(id))),
@@ -538,7 +549,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
       const reservation = await supabase
         .from("employee_meetings")
         .select("id")
-        .eq("date", meeting.date)
+        .eq("date", meetingDate)
         .eq("location", KNT_MEETING_ROOM)
         .neq("id", meeting.id)
         .lt("start_time", endTime)
@@ -556,6 +567,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
     const update = await supabase
       .from("employee_meetings")
       .update({
+        date: meetingDate,
         content: content.trim(),
         location: location.trim(),
         online_link: onlineLink.trim() || null,
@@ -589,6 +601,8 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
         return setError(insert.error.message);
       }
     }
+    try { await notifyMeetingPush(meeting.id, "updated"); }
+    catch (pushError) { console.error("Unable to send meeting update push notification:", pushError.message); }
     setSaving(false);
     onSaved();
   };
@@ -598,7 +612,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
       <div className="form-title">
         <div>
           <p className="eyebrow">EDIT MEETING</p>
-          <h2>{meeting.date}</h2>
+          <h2>{meetingDate}</h2>
         </div>
         <button
           type="button"
@@ -609,6 +623,15 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
           ×
         </button>
       </div>
+      <label>
+        Date
+        <input
+          required
+          type="date"
+          value={meetingDate}
+          onChange={(event) => setMeetingDate(event.target.value)}
+        />
+      </label>
       <div
         className="date-range"
         style={{

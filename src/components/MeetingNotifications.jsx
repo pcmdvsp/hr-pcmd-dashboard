@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
+import { enablePushNotifications, hasPushSubscription, pushSupported } from '../utils/pushNotifications'
 import './MeetingNotifications.css'
 
 const formatDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`))
@@ -10,13 +11,22 @@ const statusDateRange = notification => notification.start_date && notification.
   ? `From: ${formatDate(notification.start_date)} – To: ${formatDate(notification.end_date)}`
   : 'Date range not available'
 
-export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
+export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) {
   const [meetings, setMeetings] = useState([])
   const [views, setViews] = useState([])
   const [cancellations, setCancellations] = useState([])
   const [statusUpdates, setStatusUpdates] = useState([])
   const [statusReads, setStatusReads] = useState([])
   const [open, setOpen] = useState(false)
+  const [pushMessage, setPushMessage] = useState('')
+  const [browserRegistered, setBrowserRegistered] = useState(false)
+
+  useEffect(() => {
+    const refreshBrowserRegistration = () => hasPushSubscription().then(setBrowserRegistered).catch(() => setBrowserRegistered(false))
+    refreshBrowserRegistration()
+    window.addEventListener('focus', refreshBrowserRegistration)
+    return () => window.removeEventListener('focus', refreshBrowserRegistration)
+  }, [])
 
   const load = useCallback(async () => {
     const [attendeeResult, viewResult, cancellationResult, statusResult, statusReadResult] = await Promise.all([
@@ -85,7 +95,11 @@ export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
       if (!result.error) setViews(current => [...current.filter(view => view.meeting_id !== notification.id), { ...currentView, meeting_id: notification.id, notification_meeting_updated_at: notification.updated_at }])
     }
     setOpen(false)
-    onOpenMyStatus()
+    onOpenMeetingInfo()
+  }
+  const enablePush = async () => {
+    try { await enablePushNotifications(employeeId); setBrowserRegistered(true); setPushMessage('Browser notifications enabled.') }
+    catch (error) { setPushMessage(error.message || 'Unable to enable browser notifications.') }
   }
 
   return <div className="meeting-notifications">
@@ -94,6 +108,8 @@ export default function MeetingNotifications({ employeeId, onOpenMyStatus }) {
     </button>
     {open && <section className="notification-panel" aria-label="Notifications">
       <header><strong>Notifications</strong><span>{unreadCount} new</span></header>
+      {pushSupported() && <button type="button" className="notification-enable-push" onClick={enablePush} disabled={browserRegistered}>{browserRegistered ? 'Browser notifications registered' : Notification.permission === 'granted' ? 'Register this browser for notifications' : 'Enable browser notifications'}</button>}
+      {pushMessage && <p className="notification-push-message">{pushMessage}</p>}
       {notifications.length ? <div className="notification-list">{notifications.map(notification => <button type="button" className={`notification-item ${notification.kind === 'cancelled' ? 'is-cancelled' : ''} ${notification.kind === 'status' ? 'is-status-update' : ''}`} key={`${notification.kind}-${notification.id}`} onClick={() => openNotification(notification)}>{notification.kind === 'status' ? <><b>{notification.full_name} updated his status{notification.status === 'business_trip' && notification.participant_names?.length ? ` and ${notification.participant_names.join(', ')}` : ''} to {statusLabel[notification.status]}.</b><span>{statusDateRange(notification)}</span>{notification.status === 'business_trip' && <><small>Content: {notification.content || 'Not specified'}</small><small>Location: {notification.location || 'Not specified'}</small></>}{notification.status === 'leave' && <small>Location: {notification.location || 'Not specified'}</small>}</> : <><b>{notification.kind === 'cancelled' ? `Canceled: ${notification.content}` : notification.content || 'Meeting'}</b><span>{formatDate(notification.kind === 'cancelled' ? notification.meeting_date : notification.date)} · {formatTime(notification.start_time)} – {formatTime(notification.end_time)}</span><small>{notification.location || 'Location not specified'}</small></>}{notification.isNew && <em className="notification-new-tag">New</em>}</button>)}</div> : <p>No notifications yet.</p>}
     </section>}
   </div>

@@ -98,6 +98,10 @@ Nút **Reset password** trên Dashboard gọi Supabase Edge Function `admin-set-
 
 ## Build production
 
+### Browser push notification pilot
+
+The Admin page can register the current admin's browser and send a test Windows push notification. Assigned meeting attendees can receive pushes on meeting creation, update, cancellation, and a scheduled 15-minute reminder. Meeting reminders include **Snooze 5 minutes** and **Stop reminders** actions; clicking the notification body opens Meeting Info. Setup requires a VAPID key pair, SQL migrations, GitHub Actions public-key secret, Edge Function deployment, and an optional Supabase Cron job. See [SUPABASE_PUSH_NOTIFICATION_SETUP.md](./SUPABASE_PUSH_NOTIFICATION_SETUP.md) and [MEETING_PUSH_NOTIFICATION_DEPLOYMENT.md](./MEETING_PUSH_NOTIFICATION_DEPLOYMENT.md).
+
 ```powershell
 npm run build
 npm run preview

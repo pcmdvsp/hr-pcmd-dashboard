@@ -248,7 +248,7 @@
   font-size: 12px;
   overflow-y: auto;
   overflow-wrap: anywhere;
-  pointer-events: none;
+  pointer-events: auto;
 }
 .is-current-week .weekly-meeting-tooltip {
   top: calc(100% + 8px);
@@ -256,9 +256,27 @@
 .is-next-week .weekly-meeting-tooltip {
   bottom: calc(100% + 8px);
 }
-.weekly-meeting-tooltip span,
-.weekly-meeting-tooltip a { color: #e8f5ff; }
-.weekly-meeting-tooltip a { text-decoration: underline; }
+.weekly-meeting-tooltip span { color: #e8f5ff; }
+.weekly-meeting-tooltip-actions { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.weekly-meeting-online,
+.weekly-meeting-edit {
+  padding: 7px 12px;
+  border: 1px solid #fff;
+  border-radius: 8px;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+}
+.weekly-meeting-online { background: #168a52; text-decoration: none; box-shadow: 0 2px 7px rgba(0, 0, 0, .2); }
+.weekly-meeting-online:hover { background: #22a564; }
+.weekly-meeting-edit {
+  margin-left: auto;
+  background: #2d7fbe;
+  cursor: pointer;
+  box-shadow: 0 2px 7px rgba(0, 0, 0, .2);
+}
+.weekly-meeting-edit:hover { background: #4597d5; transform: translateY(-1px); }
 .weekly-meeting-card:hover .weekly-meeting-tooltip,
 .weekly-meeting-card:focus .weekly-meeting-tooltip { display: grid; }
 @media (max-width: 700px) {
