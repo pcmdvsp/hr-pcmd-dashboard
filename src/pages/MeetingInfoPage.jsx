@@ -218,7 +218,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
           onChange={(event) => setDate(event.target.value)}
         />
         <button onClick={() => setDate(moveDate(date, viewMode === "week" ? 7 : 1))}>Next {viewMode === "week" ? "week" : "day"} →</button></div>
-        <button className={`meeting-view-toggle ${viewMode === "day" ? "is-active" : ""}`} onClick={() => setViewMode("day")}>By day</button>
+        <button className={`meeting-view-toggle ${viewMode === "day" ? "is-active" : ""}`} onClick={() => { setDate(today()); setViewMode("day"); }}>By day</button>
         <button className={`meeting-view-toggle ${viewMode === "week" ? "is-active" : ""}`} onClick={() => setViewMode("week")}>By week</button>
         {viewMode === "week" && <label className="meeting-department-filter">Department<select value={departmentFilter} onChange={event => setDepartmentFilter(event.target.value)}><option value="all">All departments</option><option value="management">Management Board</option>{departments.map(department => <option key={department.id} value={department.id}>{department.name}</option>)}</select></label>}
       </section>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { STATUS, today } from '../utils/status'
+import { departmentAccent } from '../utils/departmentAccent'
 import './MonthlyEmployeeTimeline.css'
 
 const nextMonth = month => { const value = new Date(`${month}-01T12:00:00`); value.setMonth(value.getMonth() + 1); return value.toISOString().slice(0, 10) }
@@ -94,9 +95,9 @@ function FragmentGroup({ group, days, segmentsFor, collapsed, onToggle }) {
 function TimelineGroup({ group, days, segmentsFor, collapsed, onToggle }) {
   const todayIndex = days.indexOf(today())
   return <>
-    <tr className="timeline-group"><th colSpan={days.length + 1}><button type="button" onClick={() => onToggle(group.id)} aria-expanded={!collapsed}><i>{collapsed ? '>' : 'v'}</i>{group.name} <span>{group.employees.length}</span></button></th></tr>
+    <tr className="timeline-group"><th colSpan={days.length + 1} style={{ '--department-accent': departmentAccent(group.name, group.sortOrder) }}><button type="button" onClick={() => onToggle(group.id)} aria-expanded={!collapsed}><i>{collapsed ? '>' : 'v'}</i>{group.name} <span>{group.employees.length}</span></button></th></tr>
     {!collapsed && group.employees.map(employee => <tr key={employee.id}>
-      <th className="timeline-employee"><b>{employee.full_name}</b><small>{employee.employee_code}</small></th>
+      <th className="timeline-employee"><b>{employee.full_name}</b></th>
       {segmentsFor(employee).map((segment, index) => {
         const containsToday = todayIndex >= segment.start && todayIndex < segment.start + segment.length
         const todayPosition = containsToday ? `${((todayIndex - segment.start + 0.5) / segment.length) * 100}%` : undefined
