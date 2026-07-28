@@ -54,6 +54,7 @@ export default function StatusForm({
   const [onlineLink, setOnlineLink] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [additionalLeaveRanges, setAdditionalLeaveRanges] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [participantQuery, setParticipantQuery] = useState("");
@@ -71,9 +72,19 @@ export default function StatusForm({
   const [overtimeDates, setOvertimeDates] = useState([]);
   const formRef = useRef(null);
   const needsDetails = status === "meeting" || status === "business_trip";
+  const leaveRanges = useMemo(
+    () => [{ startDate, endDate }, ...additionalLeaveRanges],
+    [startDate, endDate, additionalLeaveRanges],
+  );
   const dates = useMemo(
-    () => datesInRange(startDate, endDate),
-    [startDate, endDate],
+    () => [
+      ...new Set(
+        (status === "leave" ? leaveRanges : [{ startDate, endDate }]).flatMap(
+          (range) => datesInRange(range.startDate, range.endDate),
+        ),
+      ),
+    ],
+    [status, leaveRanges, startDate, endDate],
   );
 
   useEffect(() => {
@@ -98,6 +109,7 @@ export default function StatusForm({
       draft?.startTime || employee.daily?.start_time?.slice(0, 5) || "",
     );
     setEndTime(draft?.endTime || employee.daily?.end_time?.slice(0, 5) || "");
+    setAdditionalLeaveRanges(draft?.additionalLeaveRanges || []);
     setParticipantQuery(draft?.participantQuery || "");
     setSelectedIds(draft?.selectedIds || (employee.id ? [employee.id] : []));
     setTripParticipantQuery(draft?.tripParticipantQuery || "");
@@ -128,6 +140,7 @@ export default function StatusForm({
         onlineLink,
         startTime,
         endTime,
+        additionalLeaveRanges,
         participantQuery,
         selectedIds,
         tripParticipantQuery,
@@ -148,6 +161,7 @@ export default function StatusForm({
     onlineLink,
     startTime,
     endTime,
+    additionalLeaveRanges,
     participantQuery,
     selectedIds,
     tripParticipantQuery,
@@ -236,6 +250,32 @@ export default function StatusForm({
     setOvertimeApproved(false);
     setOvertimeDates([]);
   };
+  const addLeaveRange = () => {
+    const nextDate = endDate || today();
+    setAdditionalLeaveRanges((ranges) => [
+      ...ranges,
+      { startDate: nextDate, endDate: nextDate },
+    ]);
+    markChanged();
+  };
+  const updateLeaveRange = (index, field, value) => {
+    setAdditionalLeaveRanges((ranges) =>
+      ranges.map((range, rangeIndex) => {
+        if (rangeIndex !== index) return range;
+        const next = { ...range, [field]: value };
+        if (field === "startDate" && value > next.endDate)
+          next.endDate = value;
+        return next;
+      }),
+    );
+    markChanged();
+  };
+  const removeLeaveRange = (index) => {
+    setAdditionalLeaveRanges((ranges) =>
+      ranges.filter((_, rangeIndex) => rangeIndex !== index),
+    );
+    markChanged();
+  };
   const toggleParticipant = (id) => {
     if (unavailable.has(id)) return;
     setSelectedIds((ids) =>
@@ -265,7 +305,8 @@ export default function StatusForm({
 
   const submit = async (event) => {
     event.preventDefault();
-    if (endDate < startDate)
+    const dateRanges = status === "leave" ? leaveRanges : [{ startDate, endDate }];
+    if (dateRanges.some((range) => !range.startDate || !range.endDate || range.endDate < range.startDate))
       return setError("The end date must not be earlier than the start date.");
     if (needsDetails && (!content.trim() || !location.trim()))
       return setError("Content and location are required.");
@@ -472,21 +513,26 @@ export default function StatusForm({
         ["business_trip", "leave", "sick"].includes(status) &&
         !groupBusinessTrip
       ) {
+        const notificationRows = status === "leave"
+          ? leaveRanges.map((range) => ({
+              employee_id: employee.id,
+              status,
+              start_date: range.startDate,
+              end_date: range.endDate,
+              content: null,
+              location: note.trim(),
+            }))
+          : [{
+              employee_id: employee.id,
+              status,
+              start_date: startDate,
+              end_date: endDate,
+              content: status === "business_trip" ? content.trim() : null,
+              location: status === "business_trip" ? location.trim() : null,
+            }];
         const notificationResult = await supabase
           .from("status_update_notifications")
-          .insert({
-            employee_id: employee.id,
-            status,
-            start_date: startDate,
-            end_date: endDate,
-            content: status === "business_trip" ? content.trim() : null,
-            location:
-              status === "business_trip"
-                ? location.trim()
-                : status === "leave"
-                  ? note.trim()
-                  : null,
-          });
+          .insert(notificationRows);
         if (notificationResult.error)
           console.error(
             "Unable to create status update notification:",
@@ -535,40 +581,18 @@ export default function StatusForm({
           ))}
         </select>
       </label>
-      <div
-        className="date-range"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
-          gap: 12,
-        }}
-      >
-        <label>
-          From date
-          <input
-            type="date"
-            min={canEditHistory ? undefined : today()}
-            value={startDate}
-            onChange={(event) => {
-              setStartDate(event.target.value);
-              if (event.target.value > endDate) setEndDate(event.target.value);
-              markChanged();
-            }}
-          />
-        </label>
-        <label>
-          To date
-          <input
-            type="date"
-            min={startDate}
-            value={endDate}
-            onChange={(event) => {
-              setEndDate(event.target.value);
-              markChanged();
-            }}
-          />
-        </label>
+      <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+        <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged(); }} /></label>
+        <label>To date<input type="date" min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); markChanged(); }} /></label>
       </div>
+      {status === "leave" && <>
+        {additionalLeaveRanges.map((range, index) => <div className="date-range leave-date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }} key={`${index}-${range.startDate}`}>
+          <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={range.startDate} onChange={(event) => updateLeaveRange(index, "startDate", event.target.value)} /></label>
+          <label>To date<input type="date" min={range.startDate} value={range.endDate} onChange={(event) => updateLeaveRange(index, "endDate", event.target.value)} /></label>
+          <button type="button" className="text-button leave-range-remove" onClick={() => removeLeaveRange(index)}>Remove this date range</button>
+        </div>)}
+        <button type="button" className="secondary-button add-leave-range" onClick={addLeaveRange}>+ Add another date range</button>
+      </>}
       {status === "meeting" && (
         <>
           <div

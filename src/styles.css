@@ -277,6 +277,8 @@ h2 {
 .status-form h2 {
   font-size: 19px;
 }
+.add-leave-range { margin-top: 10px; }
+.leave-date-range .leave-range-remove { grid-column: 1 / -1; justify-self: start; margin-top: 0; }
 .status-form label,
 .auth-card label {
   display: block;
