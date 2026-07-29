@@ -53,6 +53,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
+  const [recurrenceEditMeeting, setRecurrenceEditMeeting] = useState(null);
   const [actionMeeting, setActionMeeting] = useState(null);
   const [cancellingMeeting, setCancellingMeeting] = useState(null);
 
@@ -60,8 +61,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
     setLoading(true);
     setError("");
     const meetingQuery = viewMode === "week"
-      ? supabase.from("employee_meetings").select("id,organizer_id,date,content,location,online_link,start_time,end_time").gte("date", startOfWeek(date)).lte("date", moveDate(startOfWeek(date), 13)).order("date").order("start_time")
-      : supabase.from("employee_meetings").select("id,organizer_id,date,content,location,online_link,start_time,end_time").eq("date", date).order("start_time");
+      ? supabase.from("employee_meetings").select("id,organizer_id,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").gte("date", startOfWeek(date)).lte("date", moveDate(startOfWeek(date), 13)).order("date").order("start_time")
+      : supabase.from("employee_meetings").select("id,organizer_id,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").eq("date", date).order("start_time");
     const [meetingResult, employeeResult, departmentResult] = await Promise.all(
       [
         meetingQuery,
@@ -324,6 +325,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
               employees={employees}
               departments={departments}
               attendeeIds={selectedAttendeeIds}
+              editScope={editing.editScope || "one"}
               onClose={() => setEditing(null)}
               onSaved={() => {
                 setEditing(null);
@@ -357,7 +359,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
                 className="secondary-button"
                 onClick={() => {
                   setActionMeeting(null);
-                  setEditing(actionMeeting);
+                  if (actionMeeting.recurrence_id) setRecurrenceEditMeeting(actionMeeting);
+                  else setEditing(actionMeeting);
                 }}
               >
                 Update meeting
@@ -372,6 +375,20 @@ export default function MeetingInfoPage({ profile, goBack }) {
               >
                 Cancel meeting
               </button>
+            </div>
+          </section>
+        </div>
+      )}
+      {recurrenceEditMeeting && (
+        <div className="modal-backdrop">
+          <section className="meeting-action-dialog" role="dialog" aria-modal="true">
+            <button type="button" className="close" onClick={() => setRecurrenceEditMeeting(null)} aria-label="Close">Ã—</button>
+            <p className="eyebrow">RECURRING MEETING</p>
+            <h2>This is recurring meeting.</h2>
+            <p>Please choose your choice to edit.</p>
+            <div>
+              <button type="button" className="secondary-button" onClick={() => { setEditing({ ...recurrenceEditMeeting, editScope: "one" }); setRecurrenceEditMeeting(null); }}>Edit this meeting only</button>
+              <button type="button" className="secondary-button" onClick={() => { setEditing({ ...recurrenceEditMeeting, editScope: "future" }); setRecurrenceEditMeeting(null); }}>Edit all future meetings</button>
             </div>
           </section>
         </div>
@@ -459,7 +476,7 @@ function WeeklyMeetingCalendar({ startDate, meetings, attendees, employeeById, d
   </section>;
 }
 
-function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, onSaved }) {
+function MeetingEditor({ meeting, employees, departments, attendeeIds, editScope, onClose, onSaved }) {
   const [meetingDate, setMeetingDate] = useState(meeting.date || "");
   const [content, setContent] = useState(meeting.content || "");
   const [location, setLocation] = useState(meeting.location || "");
@@ -539,9 +556,17 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
       return setError("The end time must not be earlier than the start time.");
     setSaving(true);
     setError("");
-    const currentUnavailable = await getUnavailableMeetingParticipants([
-      meetingDate,
-    ]);
+    const targetResult = editScope === "future" && meeting.recurrence_id
+      ? await supabase.from("employee_meetings").select("id,date").eq("recurrence_id", meeting.recurrence_id).gte("date", meeting.date)
+      : { data: [{ id: meeting.id, date: meetingDate }], error: null };
+    if (targetResult.error || !targetResult.data?.length) {
+      setSaving(false);
+      return setError(targetResult.error?.message || "No meetings were found to update.");
+    }
+    const targetMeetings = targetResult.data;
+    const targetIds = targetMeetings.map((item) => item.id);
+    const targetDates = targetMeetings.map((item) => item.date);
+    const currentUnavailable = await getUnavailableMeetingParticipants(targetDates);
     const availableSelectedIds = [
       ...new Set(selectedIds.filter((id) => !currentUnavailable.has(id))),
     ];
@@ -549,32 +574,32 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
       const reservation = await supabase
         .from("employee_meetings")
         .select("id")
-        .eq("date", meetingDate)
+        .in("date", targetDates)
         .eq("location", KNT_MEETING_ROOM)
-        .neq("id", meeting.id)
         .lt("start_time", endTime)
         .gt("end_time", startTime)
-        .limit(1);
+        .limit(50);
       if (reservation.error) {
         setSaving(false);
         return setError(reservation.error.message);
       }
-      if (reservation.data?.length) {
+      if ((reservation.data || []).some((item) => !targetIds.includes(item.id))) {
         setSaving(false);
         return setError(ROOM_MESSAGE);
       }
     }
+    const updateValues = {
+      content: content.trim(),
+      location: location.trim(),
+      online_link: onlineLink.trim() || null,
+      start_time: startTime,
+      end_time: endTime,
+    };
+    if (editScope !== "future") updateValues.date = meetingDate;
     const update = await supabase
       .from("employee_meetings")
-      .update({
-        date: meetingDate,
-        content: content.trim(),
-        location: location.trim(),
-        online_link: onlineLink.trim() || null,
-        start_time: startTime,
-        end_time: endTime,
-      })
-      .eq("id", meeting.id);
+      .update(updateValues)
+      .in("id", targetIds);
     if (update.error) {
       setSaving(false);
       return setError(update.error.message);
@@ -582,7 +607,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
     const remove = await supabase
       .from("employee_meeting_attendees")
       .delete()
-      .eq("meeting_id", meeting.id);
+      .in("meeting_id", targetIds);
     if (remove.error) {
       setSaving(false);
       return setError(remove.error.message);
@@ -591,18 +616,14 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
       const insert = await supabase
         .from("employee_meeting_attendees")
         .insert(
-          availableSelectedIds.map((employeeId) => ({
-            meeting_id: meeting.id,
-            employee_id: employeeId,
-          })),
+          targetIds.flatMap((meetingId) => availableSelectedIds.map((employeeId) => ({ meeting_id: meetingId, employee_id: employeeId }))),
         );
       if (insert.error) {
         setSaving(false);
         return setError(insert.error.message);
       }
     }
-    try { await notifyMeetingPush(meeting.id, "updated"); }
-    catch (pushError) { console.error("Unable to send meeting update push notification:", pushError.message); }
+    void Promise.all(targetIds.map((meetingId) => notifyMeetingPush(meetingId, "updated").catch((pushError) => console.error("Unable to send meeting update push notification:", pushError.message))));
     setSaving(false);
     onSaved();
   };
@@ -624,11 +645,12 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, onClose, 
         </button>
       </div>
       <label>
-        Date
+        Date {editScope === "future" && <span className="subtle">(this occurrence; dates remain weekly)</span>}
         <input
           required
           type="date"
           value={meetingDate}
+          disabled={editScope === "future"}
           onChange={(event) => setMeetingDate(event.target.value)}
         />
       </label>

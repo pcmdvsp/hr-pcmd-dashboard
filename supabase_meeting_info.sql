@@ -77,6 +77,11 @@ create table if not exists public.employee_meetings (
 );
 
 alter table public.employee_meetings add column if not exists online_link text;
+alter table public.employee_meetings add column if not exists recurrence_id uuid;
+alter table public.employee_meetings add column if not exists recurrence_rule text check (recurrence_rule in ('weekly'));
+alter table public.employee_meetings add column if not exists recurrence_until date;
+create index if not exists employee_meetings_recurrence_idx on public.employee_meetings(recurrence_id, date)
+  where recurrence_id is not null;
 
 -- Overtime records are explicit exceptions on weekends. A normal working day
 -- continues to have no daily_status row unless another status is registered.

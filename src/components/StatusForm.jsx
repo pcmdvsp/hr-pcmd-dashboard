@@ -37,6 +37,17 @@ const datesInRange = (start, end) => {
   }
   return dates;
 };
+const weeklyDates = (start, until) => {
+  if (!start || !until || until < start) return [];
+  const dates = [];
+  for (let date = start; date <= until;) {
+    dates.push(date);
+    const value = new Date(`${date}T12:00:00`);
+    value.setDate(value.getDate() + 7);
+    date = value.toISOString().slice(0, 10);
+  }
+  return dates;
+};
 
 export default function StatusForm({
   employee,
@@ -54,6 +65,8 @@ export default function StatusForm({
   const [onlineLink, setOnlineLink] = useState("");
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [repeat, setRepeat] = useState("never");
+  const [repeatUntil, setRepeatUntil] = useState("");
   const [additionalLeaveRanges, setAdditionalLeaveRanges] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [departments, setDepartments] = useState([]);
@@ -79,12 +92,14 @@ export default function StatusForm({
   const dates = useMemo(
     () => [
       ...new Set(
-        (status === "leave" ? leaveRanges : [{ startDate, endDate }]).flatMap(
+        (status === "meeting"
+          ? (repeat === "weekly" ? weeklyDates(startDate, repeatUntil) : [startDate]).map((date) => ({ startDate: date, endDate: date }))
+          : status === "leave" ? leaveRanges : [{ startDate, endDate }]).flatMap(
           (range) => datesInRange(range.startDate, range.endDate),
         ),
       ),
     ],
-    [status, leaveRanges, startDate, endDate],
+    [status, repeat, repeatUntil, leaveRanges, startDate, endDate],
   );
 
   useEffect(() => {
@@ -109,6 +124,8 @@ export default function StatusForm({
       draft?.startTime || employee.daily?.start_time?.slice(0, 5) || "",
     );
     setEndTime(draft?.endTime || employee.daily?.end_time?.slice(0, 5) || "");
+    setRepeat(draft?.repeat || "never");
+    setRepeatUntil(draft?.repeatUntil || "");
     setAdditionalLeaveRanges(draft?.additionalLeaveRanges || []);
     setParticipantQuery(draft?.participantQuery || "");
     setSelectedIds(draft?.selectedIds || (employee.id ? [employee.id] : []));
@@ -140,6 +157,8 @@ export default function StatusForm({
         onlineLink,
         startTime,
         endTime,
+        repeat,
+        repeatUntil,
         additionalLeaveRanges,
         participantQuery,
         selectedIds,
@@ -161,6 +180,8 @@ export default function StatusForm({
     onlineLink,
     startTime,
     endTime,
+    repeat,
+    repeatUntil,
     additionalLeaveRanges,
     participantQuery,
     selectedIds,
@@ -305,6 +326,8 @@ export default function StatusForm({
 
   const submit = async (event) => {
     event.preventDefault();
+    if (status === "meeting" && repeat === "weekly" && (!repeatUntil || repeatUntil < startDate))
+      return setError("Repeat until must be on or after the meeting date.");
     const dateRanges = status === "leave" ? leaveRanges : [{ startDate, endDate }];
     if (dateRanges.some((range) => !range.startDate || !range.endDate || range.endDate < range.startDate))
       return setError("The end date must not be earlier than the start date.");
@@ -342,6 +365,7 @@ export default function StatusForm({
     setSaving(true);
     setError("");
     if (status === "meeting") {
+      const recurrenceId = repeat === "weekly" ? crypto.randomUUID() : null;
       const currentUnavailable = await getUnavailableMeetingParticipants(dates);
       // An unavailable organizer may still create a meeting, but neither the
       // organizer nor any unavailable employee can become an attendee.
@@ -371,6 +395,9 @@ export default function StatusForm({
         .insert(
           dates.map((date) => ({
             organizer_id: employee.id,
+            recurrence_id: recurrenceId,
+            recurrence_rule: repeat === "weekly" ? "weekly" : null,
+            recurrence_until: repeat === "weekly" ? repeatUntil : null,
             date,
             content: content.trim(),
             location: location.trim(),
@@ -581,10 +608,12 @@ export default function StatusForm({
           ))}
         </select>
       </label>
-      <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+      {status === "meeting" ? <>
+        <label>Date<input required type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); setEndDate(event.target.value); markChanged(); }} /></label>
+      </> : <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
         <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged(); }} /></label>
         <label>To date<input type="date" min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); markChanged(); }} /></label>
-      </div>
+      </div>}
       {status === "leave" && <>
         {additionalLeaveRanges.map((range, index) => <div className="date-range leave-date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }} key={`${index}-${range.startDate}`}>
           <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={range.startDate} onChange={(event) => updateLeaveRange(index, "startDate", event.target.value)} /></label>
@@ -627,6 +656,10 @@ export default function StatusForm({
                 }}
               />
             </label>
+          </div>
+          <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+            <label>Repeat<select value={repeat} onChange={(event) => { setRepeat(event.target.value); markChanged(); }}><option value="never">Never</option><option value="weekly">Weekly</option></select></label>
+            {repeat === "weekly" && <label>Repeat until<input required type="date" min={startDate} value={repeatUntil} onChange={(event) => { setRepeatUntil(event.target.value); markChanged(); }} /></label>}
           </div>
           <label>
             Search participants
