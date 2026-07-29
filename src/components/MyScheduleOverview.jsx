@@ -41,7 +41,11 @@ export default function MyScheduleOverview({ employeeId }) {
       const attendedIds = new Set((attendeeResult.data || []).map(item => item.meeting_id))
       const organizerById = new Map((profileResult.data || []).map(person => [person.id, person.full_name || person.email]))
       setRecords(statusResult.data || [])
-      setMeetings((meetingResult.data || []).filter(meeting => meeting.organizer_id === employeeId || attendedIds.has(meeting.id)).map(meeting => ({ ...meeting, organizerName: organizerById.get(meeting.organizer_id) || 'The meeting organizer' })))
+      // The organizer is not automatically a participant. Only meetings with
+      // an attendee row for this employee belong in their personal schedule.
+      // This also prevents an already-cancelled/orphaned organizer meeting
+      // from remaining visible after its attendee rows were removed.
+      setMeetings((meetingResult.data || []).filter(meeting => attendedIds.has(meeting.id)).map(meeting => ({ ...meeting, organizerName: organizerById.get(meeting.organizer_id) || 'The meeting organizer' })))
       setCalendar(calendarResult.data || [])
       setViews(viewResult.data || [])
       setLoading(false)
@@ -74,7 +78,10 @@ export default function MyScheduleOverview({ employeeId }) {
         const fallbackType = new Date(`${day.key}T12:00:00`).getDay() % 6 === 0 ? 'weekend' : 'working_day'
         const calendarDay = calendarByDate.get(day.key) || { day_type: fallbackType }
         const isWorkingDay = calendarDay.day_type === 'working_day'
-        const effectiveStatus = dayMeetings.length ? 'meeting' : record?.status || 'working'
+        // Meetings are sourced only from employee_meetings. Older deployments
+        // could leave a daily_status = meeting row behind after cancellation;
+        // it must not make a cancelled meeting reappear in My Schedule.
+        const effectiveStatus = dayMeetings.length ? 'meeting' : record?.status === 'meeting' ? 'working' : record?.status || 'working'
         const isWeekendBusinessTrip = !isWorkingDay && record?.status === 'business_trip'
         const isWeekendOvertime = !isWorkingDay && (record?.is_overtime || dayMeetings.some(meeting => meeting.is_overtime))
         const baseNonWorkingInfo = nonWorkingInfo(calendarDay)

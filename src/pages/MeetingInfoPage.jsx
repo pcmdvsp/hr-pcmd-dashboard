@@ -182,6 +182,25 @@ export default function MeetingInfoPage({ profile, goBack }) {
       .select("meeting_id,employee_id")
       .in("meeting_id", targetIds);
     if (attendeeLookup.error) return setError(attendeeLookup.error.message);
+    // Remove legacy daily-status meeting rows for the cancelled occurrences.
+    // Current meetings do not create these rows, but clearing them prevents an
+    // old cancelled meeting from continuing to appear as a status entry.
+    const legacyStatusDeletes = targetMeetings.map((target) => {
+      const attendeeIds = (attendeeLookup.data || [])
+        .filter((attendee) => attendee.meeting_id === target.id)
+        .map((attendee) => attendee.employee_id);
+      return attendeeIds.length
+        ? supabase
+            .from("daily_status")
+            .delete()
+            .eq("date", target.date)
+            .eq("status", "meeting")
+            .in("employee_id", attendeeIds)
+        : Promise.resolve({ error: null });
+    });
+    const legacyStatusResults = await Promise.all(legacyStatusDeletes);
+    const legacyStatusError = legacyStatusResults.find((result) => result.error)?.error;
+    if (legacyStatusError) return setError(legacyStatusError.message);
     const cancellationRows = (attendeeLookup.data || []).map((attendee) => {
       const target = meetingById.get(attendee.meeting_id);
       return {
