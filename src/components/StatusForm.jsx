@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabaseClient";
 import { STATUS, today } from "../utils/status";
-import { getUnavailableMeetingParticipants } from "../utils/meetingAvailability";
+import { getUnavailableMeetingParticipantsByDate } from "../utils/meetingAvailability";
 import { showRoomReservationAlert } from "./RoomReservationAlert";
 import { showSuccessAlert } from "./SuccessAlert";
 import { notifyMeetingPush } from "../utils/pushNotifications";
@@ -218,16 +218,17 @@ export default function StatusForm({
     });
   }, [status]);
   useEffect(() => {
-    if (status !== "meeting" || endDate < startDate) {
+    if (status !== "meeting" || !dates.length) {
       setUnavailable(new Map());
       return;
     }
-    getUnavailableMeetingParticipants(dates).then((nextUnavailable) => {
-      setUnavailable(nextUnavailable);
-      if (nextUnavailable.has(employee.id))
+    getUnavailableMeetingParticipantsByDate(dates).then((nextUnavailableByDate) => {
+      const currentDayUnavailable = repeat === "weekly" ? new Map() : (nextUnavailableByDate.get(startDate) || new Map());
+      setUnavailable(currentDayUnavailable);
+      if (currentDayUnavailable.has(employee.id))
         setSelectedIds((ids) => ids.filter((id) => id !== employee.id));
     });
-  }, [status, dates, startDate, endDate, employee.id]);
+  }, [status, dates, startDate, repeat, employee.id]);
 
   const filteredEmployees = useMemo(() => {
     const query = participantQuery.trim().toLowerCase();
@@ -366,12 +367,7 @@ export default function StatusForm({
     setError("");
     if (status === "meeting") {
       const recurrenceId = repeat === "weekly" ? crypto.randomUUID() : null;
-      const currentUnavailable = await getUnavailableMeetingParticipants(dates);
-      // An unavailable organizer may still create a meeting, but neither the
-      // organizer nor any unavailable employee can become an attendee.
-      const availableSelectedIds = [
-        ...new Set(selectedIds.filter((id) => !currentUnavailable.has(id))),
-      ];
+      const currentUnavailableByDate = await getUnavailableMeetingParticipantsByDate(dates);
       if (location.trim() === KNT_MEETING_ROOM) {
         const reservation = await supabase
           .from("employee_meetings")
@@ -407,25 +403,23 @@ export default function StatusForm({
             is_overtime: overtimeDates.includes(date),
           })),
         )
-        .select("id");
+        .select("id,date");
       if (meetingResult.error) {
         setSaving(false);
         return setError(meetingResult.error.message);
       }
-      const meetingIds = (meetingResult.data || []).map(
-        (meeting) => meeting.id,
-      );
-      if (meetingIds.length && availableSelectedIds.length) {
+      const createdMeetings = meetingResult.data || [];
+      const meetingIds = createdMeetings.map((meeting) => meeting.id);
+      const attendeeRows = createdMeetings.flatMap((meeting) => {
+        const unavailableOnDate = currentUnavailableByDate.get(meeting.date) || new Map();
+        return [...new Set(selectedIds)]
+          .filter((employeeId) => !unavailableOnDate.has(employeeId))
+          .map((employeeId) => ({ meeting_id: meeting.id, employee_id: employeeId }));
+      });
+      if (attendeeRows.length) {
         const attendeeResult = await supabase
           .from("employee_meeting_attendees")
-          .insert(
-            meetingIds.flatMap((meetingId) =>
-              availableSelectedIds.map((employeeId) => ({
-                meeting_id: meetingId,
-                employee_id: employeeId,
-              })),
-            ),
-          );
+          .insert(attendeeRows);
         if (attendeeResult.error) {
           setSaving(false);
           return setError(attendeeResult.error.message);
@@ -433,14 +427,12 @@ export default function StatusForm({
       }
       // The meeting and attendees are committed already. Send push delivery in
       // the background so the successful save message is not delayed.
-      void Promise.all(
-        meetingIds.map((meetingId) =>
-          notifyMeetingPush(meetingId, "created").catch((error) =>
-            console.error(
-              "Unable to send meeting push notification:",
-              error.message,
-            ),
-          ),
+      // A recurring meeting has one row per occurrence. Send a single
+      // aggregated notification so an attendee is not notified once per week.
+      void notifyMeetingPush(meetingIds, "created").catch((error) =>
+        console.error(
+          "Unable to send meeting push notification:",
+          error.message,
         ),
       );
     } else {

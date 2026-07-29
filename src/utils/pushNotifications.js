@@ -50,8 +50,11 @@ export async function sendTestPushNotification() {
   return data
 }
 
-export async function notifyMeetingPush(meetingId, event) {
-  const { data, error } = await supabase.functions.invoke('meeting-push-notification', { body: { meetingId, event } })
+export async function notifyMeetingPush(meetingIds, event) {
+  const ids = Array.isArray(meetingIds) ? meetingIds : [meetingIds]
+  const { data, error } = await supabase.functions.invoke('meeting-push-notification', {
+    body: { meetingId: ids[0], meetingIds: ids, event },
+  })
   if (error) throw error
   if (data?.error) throw new Error(data.error)
   return data

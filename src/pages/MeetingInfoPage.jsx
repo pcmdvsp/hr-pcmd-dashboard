@@ -3,7 +3,7 @@ import { Clock3, MapPin } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { formatDate, today } from "../utils/status";
 import { showRoomReservationAlert } from "../components/RoomReservationAlert";
-import { getUnavailableMeetingParticipants } from "../utils/meetingAvailability";
+import { getUnavailableMeetingParticipants, getUnavailableMeetingParticipantsByDate } from "../utils/meetingAvailability";
 import { departmentAccent } from "../utils/departmentAccent";
 import { notifyMeetingPush } from "../utils/pushNotifications";
 import "./MeetingInfoPage.css";
@@ -54,6 +54,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState(null);
   const [recurrenceEditMeeting, setRecurrenceEditMeeting] = useState(null);
+  const [recurrenceCancelMeeting, setRecurrenceCancelMeeting] = useState(null);
   const [actionMeeting, setActionMeeting] = useState(null);
   const [cancellingMeeting, setCancellingMeeting] = useState(null);
 
@@ -164,20 +165,35 @@ export default function MeetingInfoPage({ profile, goBack }) {
     setActionMeeting(null);
     setCancellingMeeting(null);
     setError("");
+    const targetResult = meeting.cancelScope === "future" && meeting.recurrence_id
+      ? await supabase
+          .from("employee_meetings")
+          .select("id,date,content,location,start_time,end_time")
+          .eq("recurrence_id", meeting.recurrence_id)
+          .gte("date", meeting.date)
+      : { data: [meeting], error: null };
+    if (targetResult.error || !targetResult.data?.length)
+      return setError(targetResult.error?.message || "No meetings were found to cancel.");
+    const targetMeetings = targetResult.data;
+    const targetIds = targetMeetings.map((item) => item.id);
+    const meetingById = new Map(targetMeetings.map((item) => [item.id, item]));
     const attendeeLookup = await supabase
       .from("employee_meeting_attendees")
-      .select("employee_id")
-      .eq("meeting_id", meeting.id);
+      .select("meeting_id,employee_id")
+      .in("meeting_id", targetIds);
     if (attendeeLookup.error) return setError(attendeeLookup.error.message);
-    const cancellationRows = (attendeeLookup.data || []).map((attendee) => ({
+    const cancellationRows = (attendeeLookup.data || []).map((attendee) => {
+      const target = meetingById.get(attendee.meeting_id);
+      return {
       employee_id: attendee.employee_id,
-      meeting_id: meeting.id,
-      content: meeting.content || "Meeting",
-      meeting_date: meeting.date,
-      start_time: meeting.start_time,
-      end_time: meeting.end_time,
-      location: meeting.location,
-    }));
+      meeting_id: attendee.meeting_id,
+      content: target?.content || "Meeting",
+      meeting_date: target?.date,
+      start_time: target?.start_time,
+      end_time: target?.end_time,
+      location: target?.location,
+    };
+    });
     if (cancellationRows.length) {
       const notificationResult = await supabase
         .from("employee_meeting_cancellations")
@@ -185,17 +201,17 @@ export default function MeetingInfoPage({ profile, goBack }) {
       if (notificationResult.error)
         return setError(notificationResult.error.message);
     }
-    try { await notifyMeetingPush(meeting.id, "cancelled"); }
+    try { await notifyMeetingPush(targetIds, "cancelled"); }
     catch (pushError) { console.error("Unable to send meeting cancellation push notification:", pushError.message); }
     const attendeesResult = await supabase
       .from("employee_meeting_attendees")
       .delete()
-      .eq("meeting_id", meeting.id);
+      .in("meeting_id", targetIds);
     if (attendeesResult.error) return setError(attendeesResult.error.message);
     const meetingResult = await supabase
       .from("employee_meetings")
       .delete()
-      .eq("id", meeting.id);
+      .in("id", targetIds);
     if (meetingResult.error) return setError(meetingResult.error.message);
     load();
   };
@@ -370,7 +386,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
                 className="secondary-button cancel-action"
                 onClick={() => {
                   setActionMeeting(null);
-                  setCancellingMeeting(actionMeeting);
+                  if (actionMeeting.recurrence_id) setRecurrenceCancelMeeting(actionMeeting);
+                  else setCancellingMeeting({ ...actionMeeting, cancelScope: "one" });
                 }}
               >
                 Cancel meeting
@@ -382,13 +399,27 @@ export default function MeetingInfoPage({ profile, goBack }) {
       {recurrenceEditMeeting && (
         <div className="modal-backdrop">
           <section className="meeting-action-dialog" role="dialog" aria-modal="true">
-            <button type="button" className="close" onClick={() => setRecurrenceEditMeeting(null)} aria-label="Close">Ã—</button>
+            <button type="button" className="close" onClick={() => setRecurrenceEditMeeting(null)} aria-label="Close">&times;</button>
             <p className="eyebrow">RECURRING MEETING</p>
             <h2>This is recurring meeting.</h2>
             <p>Please choose your choice to edit.</p>
             <div>
               <button type="button" className="secondary-button" onClick={() => { setEditing({ ...recurrenceEditMeeting, editScope: "one" }); setRecurrenceEditMeeting(null); }}>Edit this meeting only</button>
               <button type="button" className="secondary-button" onClick={() => { setEditing({ ...recurrenceEditMeeting, editScope: "future" }); setRecurrenceEditMeeting(null); }}>Edit all future meetings</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {recurrenceCancelMeeting && (
+        <div className="modal-backdrop">
+          <section className="meeting-action-dialog" role="dialog" aria-modal="true">
+            <button type="button" className="close" onClick={() => setRecurrenceCancelMeeting(null)} aria-label="Close">&times;</button>
+            <p className="eyebrow">RECURRING MEETING</p>
+            <h2>This is recurring meeting.</h2>
+            <p>Please choose which meetings you want to cancel.</p>
+            <div>
+              <button type="button" className="secondary-button cancel-action" onClick={() => { setCancellingMeeting({ ...recurrenceCancelMeeting, cancelScope: "one" }); setRecurrenceCancelMeeting(null); }}>Cancel this meeting only</button>
+              <button type="button" className="secondary-button cancel-action" onClick={() => { setCancellingMeeting({ ...recurrenceCancelMeeting, cancelScope: "future" }); setRecurrenceCancelMeeting(null); }}>Cancel all future meetings</button>
             </div>
           </section>
         </div>
@@ -401,10 +432,9 @@ export default function MeetingInfoPage({ profile, goBack }) {
             aria-modal="true"
           >
             <p className="eyebrow">CONFIRM CANCELLATION</p>
-            <h2>Cancel this meeting?</h2>
+            <h2>{cancellingMeeting.cancelScope === "future" ? "Cancel all future meetings?" : "Cancel this meeting?"}</h2>
             <p>
-              All assigned participants will be removed and receive a
-              cancellation notification.
+              All assigned participants for {cancellingMeeting.cancelScope === "future" ? "the selected and future occurrences" : "this occurrence"} will be removed and receive a cancellation notification.
             </p>
             <div>
               <button
@@ -419,7 +449,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
                 className="secondary-button cancel-action"
                 onClick={() => cancelMeeting(cancellingMeeting)}
               >
-                Cancel meeting
+                {cancellingMeeting.cancelScope === "future" ? "Cancel all future meetings" : "Cancel meeting"}
               </button>
             </div>
           </section>
@@ -499,13 +529,17 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, editScope
       setUnavailable(new Map());
       return;
     }
+    if (editScope === "future") {
+      setUnavailable(new Map());
+      return;
+    }
     getUnavailableMeetingParticipants([meetingDate]).then(
       (nextUnavailable) => {
         setUnavailable(nextUnavailable);
         setSelectedIds((ids) => ids.filter((id) => !nextUnavailable.has(id)));
       },
     );
-  }, [meetingDate]);
+  }, [meetingDate, editScope]);
   const results = useMemo(() => {
     const text = query.trim().toLowerCase();
     return text
@@ -566,10 +600,7 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, editScope
     const targetMeetings = targetResult.data;
     const targetIds = targetMeetings.map((item) => item.id);
     const targetDates = targetMeetings.map((item) => item.date);
-    const currentUnavailable = await getUnavailableMeetingParticipants(targetDates);
-    const availableSelectedIds = [
-      ...new Set(selectedIds.filter((id) => !currentUnavailable.has(id))),
-    ];
+    const currentUnavailableByDate = await getUnavailableMeetingParticipantsByDate(targetDates);
     if (location.trim() === KNT_MEETING_ROOM) {
       const reservation = await supabase
         .from("employee_meetings")
@@ -612,12 +643,16 @@ function MeetingEditor({ meeting, employees, departments, attendeeIds, editScope
       setSaving(false);
       return setError(remove.error.message);
     }
-    if (availableSelectedIds.length) {
+    const attendeeRows = targetMeetings.flatMap((targetMeeting) => {
+      const unavailableOnDate = currentUnavailableByDate.get(targetMeeting.date) || new Map();
+      return [...new Set(selectedIds)]
+        .filter((employeeId) => !unavailableOnDate.has(employeeId))
+        .map((employeeId) => ({ meeting_id: targetMeeting.id, employee_id: employeeId }));
+    });
+    if (attendeeRows.length) {
       const insert = await supabase
         .from("employee_meeting_attendees")
-        .insert(
-          targetIds.flatMap((meetingId) => availableSelectedIds.map((employeeId) => ({ meeting_id: meetingId, employee_id: employeeId }))),
-        );
+        .insert(attendeeRows);
       if (insert.error) {
         setSaving(false);
         return setError(insert.error.message);
