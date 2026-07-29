@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { today } from '../utils/status'
 
@@ -6,6 +6,13 @@ const nextDate = (date, amount) => {
   const value = new Date(`${date}T12:00:00`)
   value.setDate(value.getDate() + amount)
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`
+}
+
+const monthBounds = date => {
+  const start = `${date.slice(0, 7)}-01`
+  const end = new Date(`${start}T12:00:00`)
+  end.setMonth(end.getMonth() + 1)
+  return { start, end: end.toISOString().slice(0, 10) }
 }
 
 const fallbackCalendarDay = date => ({
@@ -20,17 +27,27 @@ export function useDashboard(selectedDate = today(), userId) {
   const [calendarDay, setCalendarDay] = useState(() => fallbackCalendarDay(selectedDate))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const statusCache = useRef(new Map())
   const date = selectedDate
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forceStatusRefresh = false) => {
     if (!supabase || !userId) {
       setEmployees([]); setDepartments([]); setCalendarDay(fallbackCalendarDay(date)); setError(''); setLoading(false)
       return
     }
     setLoading(true); setError('')
+    const statusMonth = monthBounds(date)
+    const cachedStatuses = forceStatusRefresh ? null : statusCache.current.get(statusMonth.start)
+    const statusRequest = cachedStatuses
+      ? Promise.resolve({ data: cachedStatuses, error: null })
+      : supabase
+          .from('daily_status')
+          .select('employee_id,date,status,note,content,location,start_time,end_time,is_overtime,updated_at')
+          .gte('date', statusMonth.start)
+          .lt('date', statusMonth.end)
     const [profileRes, statusRes, deptRes, calendarRes, meetingRes] = await Promise.all([
       supabase.from('profiles').select('*, departments(id,name,sort_order)').eq('active', true).order('full_name'),
-      supabase.from('daily_status').select('*'),
+      statusRequest,
       supabase.from('departments').select('*').order('sort_order'),
       supabase.from('work_calendar').select('date,day_type,holiday_name').eq('date', date).maybeSingle(),
       supabase.from('employee_meetings').select('organizer_id,is_overtime').eq('date', date).eq('is_overtime', true),
@@ -38,6 +55,7 @@ export function useDashboard(selectedDate = today(), userId) {
     if (profileRes.error || statusRes.error || deptRes.error || calendarRes.error || meetingRes.error) {
       setError(profileRes.error?.message || statusRes.error?.message || deptRes.error?.message || calendarRes.error?.message || meetingRes.error?.message)
     }
+    if (!statusRes.error && !cachedStatuses) statusCache.current.set(statusMonth.start, statusRes.data || [])
     setCalendarDay(calendarRes.data || fallbackCalendarDay(date))
     const statusesByEmployee = new Map()
     ;(statusRes.data || []).forEach(record => {
@@ -69,5 +87,5 @@ export function useDashboard(selectedDate = today(), userId) {
   }, [date, userId])
 
   useEffect(() => { load() }, [load])
-  return { employees, departments, calendarDay, isWorkingDay: calendarDay.day_type === 'working_day', loading, error, date, reload: load }
+  return { employees, departments, calendarDay, isWorkingDay: calendarDay.day_type === 'working_day', loading, error, date, reload: () => load(true) }
 }

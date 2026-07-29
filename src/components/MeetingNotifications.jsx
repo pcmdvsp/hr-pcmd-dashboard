@@ -65,7 +65,7 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
 
   useEffect(() => {
     load()
-    const interval = window.setInterval(load, 15000)
+    const interval = window.setInterval(load, 60000)
     return () => window.clearInterval(interval)
   }, [load])
 
