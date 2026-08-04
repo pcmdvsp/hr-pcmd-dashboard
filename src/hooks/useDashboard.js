@@ -87,5 +87,30 @@ export function useDashboard(selectedDate = today(), userId) {
   }, [date, userId])
 
   useEffect(() => { load() }, [load])
+  useEffect(() => {
+    if (!supabase || !userId) return undefined
+    let refreshTimer
+    const refresh = () => {
+      clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => load(true), 400)
+    }
+    const channel = supabase
+      .channel(`dashboard-day:${userId}:${date}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'daily_status', filter: `date=eq.${date}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'daily_status', filter: `date=eq.${date}` }, refresh)
+      // Delete events cannot be filtered by Postgres Changes. Deletes are rare;
+      // a debounced reload keeps a reverted status correct without polling.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'daily_status' }, refresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'employee_meetings', filter: `date=eq.${date}` }, refresh)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'employee_meetings', filter: `date=eq.${date}` }, refresh)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'employee_meetings' }, refresh)
+      .subscribe()
+    const fallback = window.setInterval(() => load(true), 30 * 60 * 1000)
+    return () => {
+      clearTimeout(refreshTimer)
+      window.clearInterval(fallback)
+      supabase.removeChannel(channel)
+    }
+  }, [date, load, userId])
   return { employees, departments, calendarDay, isWorkingDay: calendarDay.day_type === 'working_day', loading, error, date, reload: () => load(true) }
 }

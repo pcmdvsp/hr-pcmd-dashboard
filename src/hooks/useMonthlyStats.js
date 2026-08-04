@@ -15,6 +15,10 @@ export function useMonthlyStats(month) {
     if (stats.error || calendarResult.error) setError(stats.error?.message || calendarResult.error?.message)
     setRows(stats.data || []); setCalendar(calendarResult.data || []); setLoading(false)
   }, [month])
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    const fallback = window.setInterval(load, 30 * 60 * 1000)
+    return () => window.clearInterval(fallback)
+  }, [load])
   return { rows, calendar, loading, error, reload: load }
 }

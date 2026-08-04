@@ -20,16 +20,20 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
 
   useEffect(() => {
     let active = true
-    setLoading(true); setError('')
-    Promise.all([
-      supabase.from('daily_status').select('employee_id,date,status,is_overtime,content,location,note').gte('date', `${month}-01`).lt('date', nextMonth(month)),
-      supabase.from('work_calendar').select('date,day_type,holiday_name').gte('date', `${month}-01`).lt('date', nextMonth(month)),
-    ]).then(([statusResult, calendarResult]) => {
-      if (!active) return
-      if (statusResult.error || calendarResult.error) setError(statusResult.error?.message || calendarResult.error?.message)
-      setStatuses(statusResult.data || []); setCalendar(calendarResult.data || []); setLoading(false)
-    })
-    return () => { active = false }
+    const load = () => {
+      setLoading(true); setError('')
+      Promise.all([
+        supabase.from('daily_status').select('employee_id,date,status,is_overtime,content,location,note').gte('date', `${month}-01`).lt('date', nextMonth(month)),
+        supabase.from('work_calendar').select('date,day_type,holiday_name').gte('date', `${month}-01`).lt('date', nextMonth(month)),
+      ]).then(([statusResult, calendarResult]) => {
+        if (!active) return
+        if (statusResult.error || calendarResult.error) setError(statusResult.error?.message || calendarResult.error?.message)
+        setStatuses(statusResult.data || []); setCalendar(calendarResult.data || []); setLoading(false)
+      })
+    }
+    load()
+    const fallback = window.setInterval(load, 30 * 60 * 1000)
+    return () => { active = false; window.clearInterval(fallback) }
   }, [month])
 
   const calendarByDate = useMemo(() => new Map(calendar.map(day => [day.date, day])), [calendar])

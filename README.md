@@ -96,6 +96,18 @@ Nút **Reset password** trên Dashboard gọi Supabase Edge Function `admin-set-
 - Badge `New` trong lịch My Status chỉ biến mất khi user mở ngày có meeting.
 - Chuông tự làm mới định kỳ 15 giây và cũng làm mới khi người dùng bấm vào chuông.
 
+## Hybrid Realtime refresh
+
+The dashboard uses Supabase Realtime for active pages and a 30-minute fallback refresh:
+
+- The notification bell listens for assigned meetings, cancellations, and status notifications.
+- The daily dashboard listens for changes to the selected date.
+- My Status listens for the signed-in employee's status and meeting-attendee changes.
+- Meeting Info refreshes when meetings or attendees change while that page is open.
+- Monthly Statistics and the monthly timeline refresh every 30 minutes while open.
+
+For an existing Supabase project, rerun [`supabase_status_notifications.sql`](./supabase_status_notifications.sql) after deploying this version. Its idempotent publication block adds the required tables to `supabase_realtime`.
+
 ## Build production
 
 ### Browser push notification pilot

@@ -106,6 +106,24 @@ export default function MeetingInfoPage({ profile, goBack }) {
   useEffect(() => {
     load();
   }, [load]);
+  useEffect(() => {
+    let refreshTimer;
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer);
+      refreshTimer = window.setTimeout(load, 400);
+    };
+    const channel = supabase
+      .channel(`meeting-info:${profile.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "employee_meetings" }, scheduleRefresh)
+      .on("postgres_changes", { event: "*", schema: "public", table: "employee_meeting_attendees" }, scheduleRefresh)
+      .subscribe();
+    const fallback = window.setInterval(load, 30 * 60 * 1000);
+    return () => {
+      window.clearTimeout(refreshTimer);
+      window.clearInterval(fallback);
+      supabase.removeChannel(channel);
+    };
+  }, [load, profile.id]);
 
   const employeeById = useMemo(
     () => new Map(employees.map((employee) => [employee.id, employee])),

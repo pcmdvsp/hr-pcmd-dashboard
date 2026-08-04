@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Bell } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { enablePushNotifications, hasPushSubscription, pushSupported } from '../utils/pushNotifications'
@@ -27,6 +27,7 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
   const [open, setOpen] = useState(false)
   const [pushMessage, setPushMessage] = useState('')
   const [browserRegistered, setBrowserRegistered] = useState(false)
+  const realtimeRefreshTimer = useRef(null)
 
   useEffect(() => {
     const refreshBrowserRegistration = () => hasPushSubscription().then(setBrowserRegistered).catch(() => setBrowserRegistered(false))
@@ -65,9 +66,26 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
 
   useEffect(() => {
     load()
-    const interval = window.setInterval(load, 60000)
+    const interval = window.setInterval(load, 30 * 60 * 1000)
     return () => window.clearInterval(interval)
   }, [load])
+
+  useEffect(() => {
+    const scheduleRefresh = () => {
+      window.clearTimeout(realtimeRefreshTimer.current)
+      realtimeRefreshTimer.current = window.setTimeout(load, 400)
+    }
+    const channel = supabase
+      .channel(`notification-bell:${employeeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_meeting_attendees', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_meeting_cancellations', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'status_update_notifications' }, scheduleRefresh)
+      .subscribe()
+    return () => {
+      window.clearTimeout(realtimeRefreshTimer.current)
+      supabase.removeChannel(channel)
+    }
+  }, [employeeId, load])
 
   const notifications = useMemo(() => {
     const viewById = new Map(views.map(view => [view.meeting_id, view]))

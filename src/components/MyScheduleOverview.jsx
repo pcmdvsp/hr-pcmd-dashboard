@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { STATUS, today } from '../utils/status'
 import { downloadOutlookCalendar } from '../utils/outlookCalendar'
@@ -26,31 +26,52 @@ export default function MyScheduleOverview({ employeeId }) {
     })
   }, [])
 
-  useEffect(() => {
+  const load = useCallback(async () => {
     const start = days[0].key
     const end = new Date(`${days.at(-1).key}T12:00:00`); end.setDate(end.getDate() + 1)
     const endKey = dateKey(end)
-    Promise.all([
+    setLoading(true)
+    const [statusResult, meetingResult, attendeeResult, calendarResult, profileResult, viewResult] = await Promise.all([
       supabase.from('daily_status').select('date,status,is_overtime,content,location').eq('employee_id', employeeId).gte('date', start).lt('date', endKey),
       supabase.from('employee_meetings').select('id,organizer_id,date,start_time,end_time,content,location,is_overtime,updated_at').gte('date', start).lt('date', endKey).order('start_time'),
       supabase.from('employee_meeting_attendees').select('meeting_id').eq('employee_id', employeeId),
       supabase.from('work_calendar').select('date,day_type,holiday_name').gte('date', start).lt('date', endKey),
       supabase.from('profiles').select('id,full_name,email').eq('active', true),
       supabase.from('employee_meeting_views').select('meeting_id,seen_at,seen_meeting_updated_at,notification_meeting_updated_at').eq('employee_id', employeeId),
-    ]).then(([statusResult, meetingResult, attendeeResult, calendarResult, profileResult, viewResult]) => {
-      const attendedIds = new Set((attendeeResult.data || []).map(item => item.meeting_id))
-      const organizerById = new Map((profileResult.data || []).map(person => [person.id, person.full_name || person.email]))
-      setRecords(statusResult.data || [])
-      // The organizer is not automatically a participant. Only meetings with
-      // an attendee row for this employee belong in their personal schedule.
-      // This also prevents an already-cancelled/orphaned organizer meeting
-      // from remaining visible after its attendee rows were removed.
-      setMeetings((meetingResult.data || []).filter(meeting => attendedIds.has(meeting.id)).map(meeting => ({ ...meeting, organizerName: organizerById.get(meeting.organizer_id) || 'The meeting organizer' })))
-      setCalendar(calendarResult.data || [])
-      setViews(viewResult.data || [])
-      setLoading(false)
-    })
+    ])
+    const attendedIds = new Set((attendeeResult.data || []).map(item => item.meeting_id))
+    const organizerById = new Map((profileResult.data || []).map(person => [person.id, person.full_name || person.email]))
+    setRecords(statusResult.data || [])
+    // The organizer is not automatically a participant. Only meetings with
+    // an attendee row for this employee belong in their personal schedule.
+    // This also prevents an already-cancelled/orphaned organizer meeting
+    // from remaining visible after its attendee rows were removed.
+    setMeetings((meetingResult.data || []).filter(meeting => attendedIds.has(meeting.id)).map(meeting => ({ ...meeting, organizerName: organizerById.get(meeting.organizer_id) || 'The meeting organizer' })))
+    setCalendar(calendarResult.data || [])
+    setViews(viewResult.data || [])
+    setLoading(false)
   }, [employeeId, days])
+
+  useEffect(() => {
+    load()
+    let refreshTimer
+    const scheduleRefresh = () => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(load, 400)
+    }
+    const channel = supabase
+      .channel(`my-schedule:${employeeId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_status', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_meeting_attendees', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'employee_meeting_cancellations', filter: `employee_id=eq.${employeeId}` }, scheduleRefresh)
+      .subscribe()
+    const fallback = window.setInterval(load, 30 * 60 * 1000)
+    return () => {
+      window.clearTimeout(refreshTimer)
+      window.clearInterval(fallback)
+      supabase.removeChannel(channel)
+    }
+  }, [employeeId, load])
 
   const statusByDate = useMemo(() => new Map(records.map(record => [record.date, record])), [records])
   const meetingsByDate = useMemo(() => meetings.reduce((map, meeting) => { map.set(meeting.date, [...(map.get(meeting.date) || []), meeting]); return map }, new Map()), [meetings])

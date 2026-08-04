@@ -39,8 +39,37 @@ drop policy if exists "employees create own status notifications" on public.stat
 create policy "status update notifications readable"
   on public.status_update_notifications for select to authenticated using (true);
 create policy "employees create own status notifications"
-  on public.status_update_notifications for insert to authenticated
-  with check (employee_id = auth.uid() or public.is_admin());
+on public.status_update_notifications for insert to authenticated
+with check (employee_id = auth.uid() or public.is_admin());
+
+-- Hybrid refresh: publish only the application tables that the frontend
+-- subscribes to. Existing RLS select policies continue to govern delivery.
+do $$
+declare
+  realtime_table text;
+begin
+  foreach realtime_table in array array[
+    'daily_status',
+    'employee_meetings',
+    'employee_meeting_attendees',
+    'employee_meeting_cancellations',
+    'status_update_notifications'
+  ]
+  loop
+    if not exists (
+      select 1
+      from pg_publication_tables
+      where pubname = 'supabase_realtime'
+        and schemaname = 'public'
+        and tablename = realtime_table
+    ) then
+      execute format(
+        'alter publication supabase_realtime add table public.%I',
+        realtime_table
+      );
+    end if;
+  end loop;
+end $$;
 
 drop policy if exists "users read own status notification reads" on public.status_update_notification_reads;
 drop policy if exists "users manage own status notification reads" on public.status_update_notification_reads;
