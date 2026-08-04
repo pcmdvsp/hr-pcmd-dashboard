@@ -76,7 +76,7 @@ export default function StatusForm({
   const [tripParticipantIds, setTripParticipantIds] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [unavailable, setUnavailable] = useState(new Map());
-  const [saving, setSaving] = useState(false);
+  const [saving, setSavingState] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   const [draftInitialized, setDraftInitialized] = useState(false);
@@ -84,6 +84,11 @@ export default function StatusForm({
   const [overtimeApproved, setOvertimeApproved] = useState(false);
   const [overtimeDates, setOvertimeDates] = useState([]);
   const formRef = useRef(null);
+  const submitInFlight = useRef(false);
+  const setSaving = (value) => {
+    submitInFlight.current = value;
+    setSavingState(value);
+  };
   const needsDetails = status === "meeting" || status === "business_trip";
   const leaveRanges = useMemo(
     () => [{ startDate, endDate }, ...additionalLeaveRanges],
@@ -327,25 +332,44 @@ export default function StatusForm({
 
   const submit = async (event) => {
     event.preventDefault();
-    if (status === "meeting" && repeat === "weekly" && (!repeatUntil || repeatUntil < startDate))
+    // React disables the button on the next render. This synchronous guard
+    // also blocks a second click/Enter event in the same render frame.
+    if (submitInFlight.current) return;
+    setSaving(true);
+    if (status === "meeting" && repeat === "weekly" && (!repeatUntil || repeatUntil < startDate)) {
+      setSaving(false);
       return setError("Repeat until must be on or after the meeting date.");
+    }
     const dateRanges = status === "leave" ? leaveRanges : [{ startDate, endDate }];
-    if (dateRanges.some((range) => !range.startDate || !range.endDate || range.endDate < range.startDate))
+    if (dateRanges.some((range) => !range.startDate || !range.endDate || range.endDate < range.startDate)) {
+      setSaving(false);
       return setError("The end date must not be earlier than the start date.");
-    if (needsDetails && (!content.trim() || !location.trim()))
+    }
+    if (needsDetails && (!content.trim() || !location.trim())) {
+      setSaving(false);
       return setError("Content and location are required.");
-    if (status === "leave" && !note.trim())
+    }
+    if (status === "leave" && !note.trim()) {
+      setSaving(false);
       return setError("Location is required for annual leave.");
-    if (status === "meeting" && (!startTime || !endTime))
+    }
+    if (status === "meeting" && (!startTime || !endTime)) {
+      setSaving(false);
       return setError("Start time and end time are required for a meeting.");
-    if (status === "meeting" && endTime < startTime)
+    }
+    if (status === "meeting" && endTime < startTime) {
+      setSaving(false);
       return setError("The end time must not be earlier than the start time.");
+    }
     if ((status === "working" || status === "meeting") && !overtimeApproved) {
       const calendarResult = await supabase
         .from("work_calendar")
         .select("date,day_type")
         .in("date", dates);
-      if (calendarResult.error) return setError(calendarResult.error.message);
+      if (calendarResult.error) {
+        setSaving(false);
+        return setError(calendarResult.error.message);
+      }
       const calendarTypes = new Map(
         (calendarResult.data || []).map((day) => [day.date, day.day_type]),
       );
@@ -360,10 +384,10 @@ export default function StatusForm({
       if (selectedWeekendDates.length) {
         setOvertimeDates(selectedWeekendDates);
         setConfirmOvertime(true);
+        setSaving(false);
         return;
       }
     }
-    setSaving(true);
     setError("");
     if (status === "meeting") {
       const recurrenceId = repeat === "weekly" ? crypto.randomUUID() : null;

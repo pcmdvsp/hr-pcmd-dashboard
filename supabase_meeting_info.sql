@@ -108,6 +108,22 @@ create table if not exists public.employee_meeting_cancellations (
   read_at timestamptz
 );
 create index if not exists employee_meeting_cancellations_employee_idx on public.employee_meeting_cancellations(employee_id, cancelled_at desc);
+-- A cancelled meeting creates one notification per attendee. Remove legacy
+-- duplicates before enforcing that the same attendee is notified only once.
+with ranked_cancellations as (
+  select id,
+    row_number() over (
+      partition by meeting_id, employee_id
+      order by cancelled_at asc, id asc
+    ) as row_number
+  from public.employee_meeting_cancellations
+)
+delete from public.employee_meeting_cancellations as cancellation
+using ranked_cancellations as ranked
+where cancellation.id = ranked.id
+  and ranked.row_number > 1;
+create unique index if not exists employee_meeting_cancellations_meeting_employee_key
+  on public.employee_meeting_cancellations(meeting_id, employee_id);
 alter table public.employee_meeting_cancellations enable row level security;
 drop policy if exists "users read own meeting cancellations" on public.employee_meeting_cancellations;
 drop policy if exists "organizers create meeting cancellations" on public.employee_meeting_cancellations;

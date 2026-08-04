@@ -1,4 +1,4 @@
-import { Fragment, useCallback, useEffect, useMemo, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Clock3, MapPin } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { formatDate, today } from "../utils/status";
@@ -57,6 +57,7 @@ export default function MeetingInfoPage({ profile, goBack }) {
   const [recurrenceCancelMeeting, setRecurrenceCancelMeeting] = useState(null);
   const [actionMeeting, setActionMeeting] = useState(null);
   const [cancellingMeeting, setCancellingMeeting] = useState(null);
+  const cancelInFlight = useRef(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -162,6 +163,9 @@ export default function MeetingInfoPage({ profile, goBack }) {
         .map((attendee) => attendee.employee_id)
     : [];
   const cancelMeeting = async (meeting) => {
+    if (cancelInFlight.current) return;
+    cancelInFlight.current = true;
+    try {
     setActionMeeting(null);
     setCancellingMeeting(null);
     setError("");
@@ -216,7 +220,10 @@ export default function MeetingInfoPage({ profile, goBack }) {
     if (cancellationRows.length) {
       const notificationResult = await supabase
         .from("employee_meeting_cancellations")
-        .insert(cancellationRows);
+        .upsert(cancellationRows, {
+          onConflict: "meeting_id,employee_id",
+          ignoreDuplicates: true,
+        });
       if (notificationResult.error)
         return setError(notificationResult.error.message);
     }
@@ -233,6 +240,9 @@ export default function MeetingInfoPage({ profile, goBack }) {
       .in("id", targetIds);
     if (meetingResult.error) return setError(meetingResult.error.message);
     load();
+    } finally {
+      cancelInFlight.current = false;
+    }
   };
 
   return (
