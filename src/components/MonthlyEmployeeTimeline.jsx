@@ -58,9 +58,16 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
       return { status, dayType: calendarDay.day_type, holidayName: calendarDay.holiday_name, isHoliday: calendarDay.day_type === 'holiday' || Boolean(calendarDay.holiday_name), date, isToday: date === today(), content: record?.content, location: record?.location, note: record?.note }
     })
     return cells.reduce((segments, cell, dayIndex) => {
-      // Keep ordinary working days as individual blank cells. Explicit statuses
-      // use their status alone so consecutive dates become one continuous bar.
-      const key = cell.status && cell.status !== 'working' ? cell.status : `${cell.status || 'off'}:${cell.dayType}:${cell.status === 'working' || cell.dayType === 'holiday' ? cell.date : ''}`
+      // Keep ordinary working days as individual blank cells. Explicit status
+      // bars only merge when their displayed details also match. In particular,
+      // two adjacent Business trips with different content/location must remain
+      // separate so each bar has the correct tooltip.
+      const explicitKey = cell.status === 'business_trip'
+        ? `${cell.status}:${cell.content || ''}:${cell.location || ''}`
+        : cell.status
+      const key = cell.status && cell.status !== 'working'
+        ? explicitKey
+        : `${cell.status || 'off'}:${cell.dayType}:${cell.status === 'working' || cell.dayType === 'holiday' ? cell.date : ''}`
       const previous = segments.at(-1)
       if (previous?.key === key) previous.length += 1
       else segments.push({ ...cell, key, length: 1, start: dayIndex })

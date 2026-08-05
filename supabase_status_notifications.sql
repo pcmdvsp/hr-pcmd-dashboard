@@ -120,6 +120,20 @@ begin
     raise exception 'One or more selected employees are inactive';
   end if;
 
+  -- Never replace an existing unavailable status for a colleague. The person
+  -- creating the trip may update their own trip, but selected colleagues must
+  -- be available on every requested date.
+  if exists (
+    select 1
+    from daily_status existing_status
+    where existing_status.employee_id = any(target_ids)
+      and existing_status.employee_id <> auth.uid()
+      and existing_status.date between p_start_date and p_end_date
+      and existing_status.status in ('business_trip', 'leave', 'sick')
+  ) then
+    raise exception 'One or more selected employees are unavailable during the selected date range';
+  end if;
+
   insert into daily_status (employee_id, date, status, is_overtime, note, content, location, start_time, end_time)
   select target_id, day::date, 'business_trip', false, null, trim(p_content), trim(p_location), null, null
   from unnest(target_ids) as target_id

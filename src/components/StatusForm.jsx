@@ -75,7 +75,9 @@ export default function StatusForm({
   const [tripParticipantQuery, setTripParticipantQuery] = useState("");
   const [tripParticipantIds, setTripParticipantIds] = useState([]);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
+  const [selectedTripDepartment, setSelectedTripDepartment] = useState(null);
   const [unavailable, setUnavailable] = useState(new Map());
+  const [tripUnavailable, setTripUnavailable] = useState(new Map());
   const [saving, setSavingState] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -139,6 +141,7 @@ export default function StatusForm({
       draft?.tripParticipantIds || (employee.id ? [employee.id] : []),
     );
     setSelectedDepartment(null);
+    setSelectedTripDepartment(null);
     setConfirmOvertime(false);
     setOvertimeApproved(false);
     setOvertimeDates([]);
@@ -205,7 +208,7 @@ export default function StatusForm({
         .select("id,full_name,employee_code,department_id")
         .eq("active", true)
         .order("full_name"),
-      status === "meeting"
+      status === "meeting" || (status === "business_trip" && !onClose)
         ? supabase
             .from("departments")
             .select("id,name,sort_order")
@@ -234,6 +237,19 @@ export default function StatusForm({
         setSelectedIds((ids) => ids.filter((id) => id !== employee.id));
     });
   }, [status, dates, startDate, repeat, employee.id]);
+  useEffect(() => {
+    if (status !== "business_trip" || onClose || !dates.length) {
+      setTripUnavailable(new Map());
+      return;
+    }
+    getUnavailableMeetingParticipantsByDate(dates).then((byDate) => {
+      // A colleague is unavailable if they have an unavailable status on any
+      // day in the entire requested Business trip range.
+      setTripUnavailable(
+        new Map([...byDate.values()].flatMap((unavailableByDate) => [...unavailableByDate])),
+      );
+    });
+  }, [status, onClose, dates]);
 
   const filteredEmployees = useMemo(() => {
     const query = participantQuery.trim().toLowerCase();
@@ -267,6 +283,14 @@ export default function StatusForm({
         )
       : [];
   }, [employees, tripParticipantQuery, employee.id]);
+  const filteredTripDepartments = useMemo(() => {
+    const query = tripParticipantQuery.trim().toLowerCase();
+    return query
+      ? departments.filter((department) =>
+          department.name.toLowerCase().includes(query),
+        )
+      : [];
+  }, [departments, tripParticipantQuery]);
   const selectedTripEmployees = useMemo(
     () => employees.filter((item) => tripParticipantIds.includes(item.id)),
     [employees, tripParticipantIds],
@@ -324,9 +348,26 @@ export default function StatusForm({
     markChanged();
   };
   const toggleTripParticipant = (id) => {
-    setTripParticipantIds((ids) =>
-      ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id],
+    setTripParticipantIds((ids) => {
+      if (ids.includes(id)) return ids.filter((value) => value !== id);
+      if (tripUnavailable.has(id)) return ids;
+      return [...ids, id];
+    });
+    markChanged();
+  };
+  const addTripDepartmentParticipants = (departmentId) => {
+    const department = departments.find((item) => item.id === departmentId);
+    const availableMembers = employees.filter(
+      (item) =>
+        item.id !== employee.id &&
+        item.department_id === departmentId &&
+        !tripUnavailable.has(item.id),
     );
+    setTripParticipantIds((ids) => [
+      ...new Set([...ids, ...availableMembers.map((member) => member.id)]),
+    ]);
+    setSelectedTripDepartment(department || null);
+    setTripParticipantQuery("");
     markChanged();
   };
 
@@ -498,6 +539,26 @@ export default function StatusForm({
       const tripEmployeeIds = [
         ...new Set([employee.id, ...tripParticipantIds]),
       ];
+      if (groupBusinessTrip) {
+        // Check again immediately before saving. The availability list shown
+        // in the form may be stale if another user updated a status meanwhile.
+        const unavailableByDate = await getUnavailableMeetingParticipantsByDate(dates);
+        const unavailableTripParticipants = new Map(
+          [...unavailableByDate.values()].flatMap((items) => [...items]),
+        );
+        const conflictingIds = tripEmployeeIds.filter(
+          (id) => id !== employee.id && unavailableTripParticipants.has(id),
+        );
+        if (conflictingIds.length) {
+          const names = conflictingIds
+            .map((id) => employees.find((item) => item.id === id)?.full_name || "Selected employee")
+            .join(", ");
+          setSaving(false);
+          return setError(
+            `${names} ${conflictingIds.length === 1 ? "is" : "are"} unavailable during the selected date range.`,
+          );
+        }
+      }
       const result = groupBusinessTrip
         ? await supabase.rpc("create_group_business_trip", {
             p_employee_ids: tripEmployeeIds,
@@ -803,6 +864,37 @@ export default function StatusForm({
               placeholder="Search by name or employee ID"
             />
           </label>
+          {selectedTripDepartment && (
+            <div className="employee-list" aria-label="Business trip department members">
+              <p className="subtle">{selectedTripDepartment.name}</p>
+              {employees
+                .filter(
+                  (item) =>
+                    item.id !== employee.id &&
+                    item.department_id === selectedTripDepartment.id,
+                )
+                .map((item) => {
+                  const reason = tripUnavailable.get(item.id);
+                  const isSelected = tripParticipantIds.includes(item.id);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      disabled={Boolean(reason) && !isSelected}
+                      className={`employee-badge is-editable ${isSelected ? "is-selected" : ""}`}
+                      style={reason && !isSelected ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
+                      onClick={() => toggleTripParticipant(item.id)}
+                    >
+                      {isSelected ? "✓ " : ""}
+                      {item.full_name}{" "}
+                      <span className="employee-code">
+                        {reason ? `Unavailable: ${reason}` : item.employee_code}
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          )}
           <div
             className="employee-list"
             aria-label="Business trip participants"
@@ -836,19 +928,40 @@ export default function StatusForm({
               aria-label="Business trip participant search results"
             >
               {filteredTripEmployees.map((item) => (
+                (() => {
+                  const reason = tripUnavailable.get(item.id);
+                  const isSelected = tripParticipantIds.includes(item.id);
+                  return (
+                    <button
+                      type="button"
+                      key={item.id}
+                      disabled={Boolean(reason) && !isSelected}
+                      className={`employee-badge is-editable ${isSelected ? "is-selected" : ""}`}
+                      style={reason && !isSelected ? { opacity: 0.55, cursor: "not-allowed" } : undefined}
+                      onClick={() => toggleTripParticipant(item.id)}
+                    >
+                      {isSelected ? "✓ " : ""}
+                      {item.full_name}{" "}
+                      <span className="employee-code">
+                        {reason ? `Unavailable: ${reason}` : item.employee_code}
+                      </span>
+                    </button>
+                  );
+                })()
+              ))}
+              {filteredTripDepartments.map((department) => (
                 <button
                   type="button"
-                  key={item.id}
-                  className={`employee-badge is-editable ${tripParticipantIds.includes(item.id) ? "is-selected" : ""}`}
-                  onClick={() => toggleTripParticipant(item.id)}
+                  key={department.id}
+                  className="employee-badge is-editable"
+                  onClick={() => addTripDepartmentParticipants(department.id)}
                 >
-                  {tripParticipantIds.includes(item.id) ? "✓ " : ""}
-                  {item.full_name}{" "}
-                  <span className="employee-code">{item.employee_code}</span>
+                  {department.name}{" "}
+                  <span className="employee-code">Add available members</span>
                 </button>
               ))}
-              {filteredTripEmployees.length === 0 && (
-                <p className="empty">No matching employees</p>
+              {filteredTripEmployees.length === 0 && filteredTripDepartments.length === 0 && (
+                <p className="empty">No matching employees or departments</p>
               )}
             </div>
           )}
