@@ -42,6 +42,8 @@
 .timeline-cell.is-business_trip span { background: #f1c40f; }
 .timeline-cell.is-leave span { background: #3498db; }
 .timeline-cell.is-sick span { background: #e74c3c; }
+.timeline-cell.is-editable-status { cursor: pointer; }
+.timeline-cell.is-editable-status:hover span { filter: brightness(1.12) saturate(1.12); box-shadow: 0 0 0 2px #ffffff, 0 0 0 3px #2e6fae; }
 .timeline-cell.is-single span { width: 18px; margin-inline: auto; border-radius: 4px; }
 .monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-cell { background: #f7f5fb; }
 .monthly-timeline-table tbody tr:not(.timeline-group):hover .timeline-employee { background: #eeeaf7; box-shadow: inset 4px 0 0 #8b73b3; }
@@ -54,4 +56,30 @@
 .monthly-timeline-panel footer i { width: 11px; height: 11px; border-radius: 50%; }
 .monthly-timeline-panel footer .timeline-working { box-sizing: border-box; border: 1px solid #cbd7e2; background: #fff; }
 .monthly-timeline-panel footer .timeline-off { background: linear-gradient(90deg, #cbd5df 0 50%, #f5bfd1 50% 100%); }
+.timeline-edit-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(20, 40, 64, .42); }
+.timeline-edit-dialog { position: relative; width: min(100%, 480px); max-height: min(82vh, 680px); overflow: auto; padding: 24px; border: 1px solid #d7e3ef; border-radius: 16px; background: #fff; box-shadow: 0 20px 55px rgba(18, 42, 70, .28); }
+.timeline-edit-dialog .eyebrow { margin: 0 0 5px; }
+.timeline-edit-dialog h3 { margin: 0; color: #203d59; font-size: 24px; }
+.timeline-edit-person { margin: 5px 0; color: #2d5f8f; font-weight: 700; }
+.timeline-edit-scope { margin: 0 0 16px; color: #61778e; font-size: 13px; }
+.timeline-edit-dialog label { display: grid; gap: 6px; margin-top: 13px; color: #304f6d; font-weight: 700; }
+.timeline-edit-date-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.timeline-edit-date-fields label { min-width: 0; }
+.timeline-edit-dialog input, .timeline-edit-dialog textarea { width: 100%; box-sizing: border-box; padding: 10px 11px; border: 1px solid #cbdbea; border-radius: 8px; color: #203d59; font: inherit; font-weight: 400; }
+.timeline-edit-dialog textarea { resize: vertical; }
+.timeline-edit-close { position: absolute; top: 13px; right: 13px; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 50%; background: #edf3f8; color: #274b6e; font-size: 24px; line-height: 1; cursor: pointer; }
+.timeline-edit-actions, .timeline-edit-confirm { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 20px; }
+.timeline-edit-actions .primary-button { width: auto; margin-left: auto; }
+.timeline-edit-actions .secondary-button { width: auto; }
+.timeline-action-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; }
+.timeline-action-options .primary-button { width: 100%; }
+.timeline-action-options .timeline-cancel-status-button { width: 100%; min-height: 42px; border: 2px solid #c93c3c; border-radius: 8px; background: #fff; color: #b42318; font: inherit; font-size: 16px; font-weight: 700; }
+.timeline-action-options .timeline-cancel-status-button:hover { background: #fff4f3; }
+.timeline-revert-button { color: #a33636; text-align: left; }
+.timeline-edit-confirm { flex-wrap: wrap; justify-content: flex-end; padding: 12px; border-radius: 9px; background: #fff6f4; }
+.timeline-edit-confirm p { width: 100%; margin: 0 0 4px; color: #863737; font-weight: 700; }
+.timeline-edit-confirm > span { width: 100%; color: #6b5960; font-size: 13px; line-height: 1.45; }
+.timeline-edit-confirm .danger-button { width: auto; padding: 9px 13px; border: 0; border-radius: 8px; background: #c93c3c; color: #fff; font: inherit; font-weight: 700; cursor: pointer; }
+.timeline-edit-confirm .danger-button:disabled { opacity: .65; cursor: wait; }
+@media (max-width: 640px) { .timeline-edit-backdrop { align-items: end; padding: 0; } .timeline-edit-dialog { width: 100%; max-height: 86vh; border-radius: 16px 16px 0 0; } .timeline-edit-actions { align-items: stretch; flex-direction: column; } .timeline-edit-actions .primary-button { margin-left: 0; } .timeline-edit-date-fields { gap: 9px; } }
 @media (max-width: 640px) { .monthly-timeline-panel { padding: 14px; } .monthly-timeline-panel > header { align-items: start; flex-direction: column; gap: 5px; } .monthly-timeline-wrap { max-height: 60vh; } }

@@ -149,6 +149,98 @@ $$;
 
 grant execute on function public.create_group_business_trip(uuid[], date, date, text, text) to authenticated;
 
+-- Edit one continuous status block from the monthly timeline. Normal users can
+-- change only their own records from today onward; admins retain history access.
+-- Deleting the explicit rows makes each date fall back to work_calendar
+-- automatically (Working on weekdays, weekend/holiday otherwise).
+create or replace function public.edit_timeline_status(
+  p_employee_id uuid,
+  p_status text,
+  p_original_start_date date,
+  p_original_end_date date,
+  p_apply_from_date date,
+  p_to_date date,
+  p_content text,
+  p_location text,
+  p_note text,
+  p_revert_future boolean default false
+) returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if auth.uid() is null then raise exception 'Authentication is required'; end if;
+  if p_status not in ('business_trip', 'leave', 'sick') then raise exception 'This status cannot be edited here'; end if;
+  if p_employee_id is null or p_original_start_date is null or p_original_end_date is null or p_apply_from_date is null then raise exception 'Missing status period'; end if;
+  if p_original_end_date < p_original_start_date or p_apply_from_date < p_original_start_date then raise exception 'Invalid status period'; end if;
+  if not public.is_admin() and p_employee_id <> auth.uid() then raise exception 'You can edit only your own status'; end if;
+  if not public.is_admin() and p_apply_from_date < current_date then raise exception 'Normal users can edit from today onward only'; end if;
+  if not coalesce(p_revert_future, false) and (p_to_date is null or p_to_date < p_apply_from_date) then raise exception 'To date must be on or after the first editable date'; end if;
+  if not coalesce(p_revert_future, false) and p_status = 'business_trip' and (coalesce(trim(p_content), '') = '' or coalesce(trim(p_location), '') = '') then raise exception 'Content and location are required'; end if;
+  if not coalesce(p_revert_future, false) and p_status in ('leave', 'sick') and coalesce(trim(p_note), '') = '' then raise exception 'Status detail is required'; end if;
+
+  if coalesce(p_revert_future, false) then
+    delete from public.daily_status
+    where employee_id = p_employee_id
+      and date between p_apply_from_date and p_original_end_date
+      and status = p_status;
+    return;
+  end if;
+
+  -- Update only the part that is permitted to change. Historical rows remain
+  -- untouched for normal users even when the original status began earlier.
+  update public.daily_status
+  set content = case when p_status = 'business_trip' then trim(p_content) else null end,
+      location = case when p_status = 'business_trip' then trim(p_location) else null end,
+      note = case when p_status = 'business_trip' then null else trim(p_note) end,
+      is_overtime = false
+  where employee_id = p_employee_id
+    and date between p_apply_from_date and least(p_original_end_date, p_to_date)
+    and status = p_status;
+
+  -- An unavailable employee cannot remain an attendee of a meeting on the
+  -- newly updated dates. Reverting does not recreate attendance automatically.
+  delete from public.employee_meeting_attendees attendee
+  using public.employee_meetings meeting
+  where attendee.meeting_id = meeting.id
+    and attendee.employee_id = p_employee_id
+    and meeting.date between p_apply_from_date and p_to_date;
+
+  -- Shortening removes every explicit row after the new end, including
+  -- weekends. With no row, the frontend derives the calendar default.
+  if p_to_date < p_original_end_date then
+    delete from public.daily_status
+    where employee_id = p_employee_id
+      and date > p_to_date and date <= p_original_end_date
+      and status = p_status;
+  elsif p_to_date > p_original_end_date then
+    insert into public.daily_status (employee_id, date, status, is_overtime, note, content, location, start_time, end_time)
+    select p_employee_id, day::date, p_status, false,
+      case when p_status = 'business_trip' then null else trim(p_note) end,
+      case when p_status = 'business_trip' then trim(p_content) else null end,
+      case when p_status = 'business_trip' then trim(p_location) else null end,
+      null, null
+    from generate_series(greatest(p_original_end_date + 1, p_apply_from_date), p_to_date, interval '1 day') as day
+    on conflict (employee_id, date) do update set
+      status = excluded.status, is_overtime = false, note = excluded.note,
+      content = excluded.content, location = excluded.location,
+      start_time = null, end_time = null;
+  end if;
+
+  insert into public.status_update_notifications (employee_id, status, start_date, end_date, content, location)
+  values (
+    p_employee_id,
+    p_status,
+    p_apply_from_date,
+    p_to_date,
+    case when p_status = 'business_trip' then trim(p_content) else null end,
+    case when p_status in ('business_trip', 'leave') then coalesce(trim(p_location), trim(p_note)) else null end
+  );
+end;
+$$;
+grant execute on function public.edit_timeline_status(uuid, text, date, date, date, date, text, text, text, boolean) to authenticated;
+
 -- Browser push subscriptions. A user can manage only subscriptions created by
 -- their own authenticated account; the Edge Function uses the service role to send.
 create table if not exists public.push_subscriptions (
