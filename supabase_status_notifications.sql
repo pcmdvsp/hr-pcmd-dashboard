@@ -19,6 +19,10 @@ alter table public.status_update_notifications add column if not exists end_date
 alter table public.status_update_notifications add column if not exists content text;
 alter table public.status_update_notifications add column if not exists location text;
 alter table public.status_update_notifications add column if not exists participant_ids uuid[];
+alter table public.status_update_notifications add column if not exists action text not null default 'updated';
+alter table public.status_update_notifications drop constraint if exists status_update_notifications_action_check;
+alter table public.status_update_notifications add constraint status_update_notifications_action_check
+  check (action in ('updated', 'removed'));
 create index if not exists status_update_notifications_created_idx
   on public.status_update_notifications(created_at desc);
 
@@ -185,6 +189,8 @@ begin
     where employee_id = p_employee_id
       and date between p_apply_from_date and p_original_end_date
       and status = p_status;
+    insert into public.status_update_notifications (employee_id, status, start_date, end_date, content, location, action)
+    values (p_employee_id, p_status, p_apply_from_date, p_original_end_date, null, null, 'removed');
     return;
   end if;
 
@@ -228,14 +234,15 @@ begin
       start_time = null, end_time = null;
   end if;
 
-  insert into public.status_update_notifications (employee_id, status, start_date, end_date, content, location)
+  insert into public.status_update_notifications (employee_id, status, start_date, end_date, content, location, action)
   values (
     p_employee_id,
     p_status,
     p_apply_from_date,
     p_to_date,
     case when p_status = 'business_trip' then trim(p_content) else null end,
-    case when p_status in ('business_trip', 'leave') then coalesce(trim(p_location), trim(p_note)) else null end
+    case when p_status in ('business_trip', 'leave') then coalesce(trim(p_location), trim(p_note)) else null end,
+    'updated'
   );
 end;
 $$;
