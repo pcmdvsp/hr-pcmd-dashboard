@@ -291,6 +291,13 @@ export default function StatusForm({
         )
       : [];
   }, [departments, tripParticipantQuery]);
+  const selectedMeetingEmployees = useMemo(
+    () =>
+      employees.filter(
+        (item) => item.id !== employee.id && selectedIds.includes(item.id),
+      ),
+    [employees, employee.id, selectedIds],
+  );
   const selectedTripEmployees = useMemo(
     () => employees.filter((item) => tripParticipantIds.includes(item.id)),
     [employees, tripParticipantIds],
@@ -328,10 +335,11 @@ export default function StatusForm({
     markChanged();
   };
   const toggleParticipant = (id) => {
-    if (unavailable.has(id)) return;
-    setSelectedIds((ids) =>
-      ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id],
-    );
+    setSelectedIds((ids) => {
+      if (ids.includes(id)) return ids.filter((value) => value !== id);
+      if (unavailable.has(id)) return ids;
+      return [...ids, id];
+    });
     markChanged();
   };
   const addDepartmentParticipants = (departmentId) => {
@@ -770,6 +778,27 @@ export default function StatusForm({
               </span>
             </button>
           </div>
+          {selectedMeetingEmployees.length > 0 && (
+            <div className="employee-list" aria-label="Selected meeting participants">
+              <p className="subtle">Selected participants</p>
+              {selectedMeetingEmployees.map((item) => {
+                const reason = unavailable.get(item.id);
+                return (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className="employee-badge is-editable is-selected"
+                    onClick={() => toggleParticipant(item.id)}
+                  >
+                    ✓ {item.full_name}{" "}
+                    <span className="employee-code">
+                      {reason ? `Unavailable: ${reason}` : item.employee_code}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
           {selectedDepartment && (
             <div
               className="employee-list"
