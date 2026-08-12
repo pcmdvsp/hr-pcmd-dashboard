@@ -654,7 +654,21 @@ export default function StatusForm({
     }
     setSaving(false);
     setSaved(true);
-    showSuccessAlert("Your status has been updated successfully.");
+    showSuccessAlert(
+      status === "leave"
+        ? {
+            message: "Your annual leave status has been updated successfully. Please submit the official leave request in the company portal.",
+            actionLabel: "Submit Leave Request on Vietsovpetro Portal",
+            actionUrl: "https://phep.vietsov.com.vn/login",
+          }
+        : status === "business_trip"
+          ? {
+              message: "Your business trip status has been updated successfully. Please submit the official business trip request in the company portal.",
+              actionLabel: "Submit Business trip Request on Vietsovpetro Portal",
+              actionUrl: "http://nhansu.vietsov.com.vn/",
+            }
+          : "Your status has been updated successfully.",
+    );
     onSaved?.();
     onClose?.();
   };
