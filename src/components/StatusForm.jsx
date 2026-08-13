@@ -626,14 +626,19 @@ export default function StatusForm({
         !groupBusinessTrip
       ) {
         const notificationRows = status === "leave"
-          ? leaveRanges.map((range) => ({
-              employee_id: employee.id,
-              status,
-              start_date: range.startDate,
-              end_date: range.endDate,
-              content: null,
-              location: note.trim(),
-            }))
+          ? [...new Map(
+              leaveRanges.map((range) => [
+                `${range.startDate}:${range.endDate}`,
+                {
+                  employee_id: employee.id,
+                  status,
+                  start_date: range.startDate,
+                  end_date: range.endDate,
+                  content: null,
+                  location: note.trim(),
+                },
+              ]),
+            ).values()]
           : [{
               employee_id: employee.id,
               status,
