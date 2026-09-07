@@ -55,9 +55,7 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo, re
       ? await supabase.from('employee_meetings').select('id,date,start_time,end_time,content,location,updated_at,recurrence_id,recurrence_rule,recurrence_until,external_source').in('id', ids).order('date').order('start_time')
       : { data: [], error: null }
     if (meetingResult.error) return
-    const statusUpdates = (statusResult.data || []).filter(item =>
-      item.employee_id === employeeId || (item.participant_ids || []).includes(employeeId)
-    )
+    const statusUpdates = statusResult.data || []
     const statusEmployeeIds = [...new Set(statusUpdates.flatMap(item => [item.employee_id, ...(item.participant_ids || [])]))]
     const employeeResult = statusEmployeeIds.length
       ? await supabase.from('profiles').select('id,full_name').in('id', statusEmployeeIds)
