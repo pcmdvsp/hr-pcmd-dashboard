@@ -2,7 +2,10 @@
 create extension if not exists "pgcrypto";
 create table if not exists departments (id uuid primary key default gen_random_uuid(), name text not null unique, sort_order integer not null default 0);
 create table if not exists profiles (id uuid primary key references auth.users(id) on delete cascade, email text not null unique, employee_code text not null unique, full_name text not null, department_id uuid references departments(id) on delete set null, role text not null default 'normal' check (role in ('admin','normal')), position text, active boolean not null default true, must_change_password boolean not null default true, created_at timestamptz not null default now(), updated_at timestamptz not null default now());
-create table if not exists daily_status (id uuid primary key default gen_random_uuid(), employee_id uuid not null references profiles(id) on delete cascade, date date not null, status text not null check (status in ('business_trip','leave','sick')), note text, created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(employee_id,date));
+create table if not exists daily_status (id uuid primary key default gen_random_uuid(), employee_id uuid not null references profiles(id) on delete cascade, date date not null, status text not null check (status in ('business_trip','leave','sick')), note text, source text not null default 'manual' check (source in ('manual','vsp')), created_at timestamptz not null default now(), updated_at timestamptz not null default now(), unique(employee_id,date));
+alter table daily_status add column if not exists source text not null default 'manual';
+alter table daily_status drop constraint if exists daily_status_source_check;
+alter table daily_status add constraint daily_status_source_check check (source in ('manual','vsp'));
 create index if not exists profiles_department_active_idx on profiles(department_id,active); create index if not exists daily_status_date_idx on daily_status(date); create index if not exists daily_status_employee_date_idx on daily_status(employee_id,date);
 create or replace function set_updated_at() returns trigger language plpgsql as $$ begin new.updated_at=now(); return new; end $$;
 create trigger profiles_updated before update on profiles for each row execute function set_updated_at(); create trigger daily_status_updated before update on daily_status for each row execute function set_updated_at();
@@ -16,9 +19,16 @@ create policy "departments readable" on departments for select to authenticated 
 create policy "active profiles readable" on profiles for select to authenticated using (active=true or id=auth.uid() or is_admin());
 create policy "admins manage profiles" on profiles for all to authenticated using (is_admin()) with check (is_admin());
 create policy "statuses readable" on daily_status for select to authenticated using (true);
-create policy "own status insert" on daily_status for insert to authenticated with check (employee_id=auth.uid() or is_admin());
-create policy "own status update" on daily_status for update to authenticated using (employee_id=auth.uid() or is_admin()) with check (employee_id=auth.uid() or is_admin());
-create policy "own status delete" on daily_status for delete to authenticated using (employee_id=auth.uid() or is_admin());
+drop policy if exists "own status insert" on daily_status;
+drop policy if exists "own status update" on daily_status;
+drop policy if exists "own status delete" on daily_status;
+create policy "own status insert" on daily_status for insert to authenticated
+  with check (is_admin() or (employee_id=auth.uid() and source='manual'));
+create policy "own status update" on daily_status for update to authenticated
+  using (is_admin() or (employee_id=auth.uid() and source='manual'))
+  with check (is_admin() or (employee_id=auth.uid() and source='manual'));
+create policy "own status delete" on daily_status for delete to authenticated
+  using (is_admin() or (employee_id=auth.uid() and source='manual'));
 -- Sample organization. Create corresponding Auth users in Authentication > Users, then replace UUIDs below with their ids.
 insert into departments(name,sort_order) values ('Phòng Kế hoạch',1),('Phòng Tổ chức',2),('Phòng Tài chính',3),('Phòng Công nghệ',4) on conflict(name) do nothing;
 -- Example profile, after creating an Auth user:

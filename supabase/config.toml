@@ -14,3 +14,32 @@ verify_jwt = false
 
 [functions.meeting-reminder-action]
 verify_jwt = false
+
+[functions.test-vsp-leave]
+# This proof-of-concept reads external leave data and must only be callable by
+# a user with a valid Supabase session.
+verify_jwt = true
+
+[functions.sync-vsp-leave]
+# Manual calls validate an Admin JWT in the handler; scheduled calls validate
+# the protected x-cron-secret header.
+verify_jwt = false
+
+[functions.test-vsp-meeting-info]
+# The eOffice session credentials are sensitive and this diagnostic endpoint is
+# restricted to authenticated, active administrators.
+verify_jwt = true
+
+[functions.sync-vsp-meetings]
+# Invoked only by pg_cron with the shared x-cron-secret header.
+verify_jwt = false
+
+[functions.test-vsp-business-trip-info]
+# This diagnostic reads an authenticated HR WebForms page and is restricted to
+# authenticated, active administrators.
+verify_jwt = true
+
+[functions.partner-leave-api]
+# This server-to-server endpoint authenticates a partner-specific opaque token
+# inside the handler. It does not accept Supabase user JWTs as partner access.
+verify_jwt = false

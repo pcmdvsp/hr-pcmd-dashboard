@@ -19,6 +19,8 @@
 .notification-item.is-cancelled b { color: #b42318; }
 .notification-item.is-status-update { background: #f3f9fd; }
 .notification-item.is-status-update b { color: #1e5e89; }
+.notification-item .notification-sync-source { display: block; margin-top: 2px; color: #087a51; font-size: 12px; font-weight: 800; letter-spacing: .01em; }
+.notification-preview-note { margin: 0; padding: 9px 12px; background: #fff8df; color: #785b15; font-size: 12px; line-height: 1.4; }
 .notification-new-tag { position: absolute; top: 13px; right: 14px; padding: 3px 7px; border-radius: 999px; background: #e4f2fd; color: #176c9d; font-size: 10px; font-style: normal; font-weight: 700; text-transform: uppercase; }
 
 @media (max-width: 640px) {

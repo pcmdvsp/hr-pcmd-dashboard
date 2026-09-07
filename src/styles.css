@@ -406,6 +406,45 @@ h2 {
 .push-test-panel small { margin-top: 4px; color: #718095; }
 .push-test-panel > div:last-of-type { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .push-test-panel > p { grid-column: 1 / -1; margin: 0; }
+.vsp-action-panel .vsp-date-field {
+  justify-self: end;
+  text-align: right;
+}
+.vsp-action-panel .vsp-date-field input { margin-left: auto; }
+.vsp-action-panel > .vsp-action-buttons {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+}
+.vsp-action-panel .vsp-get-button { width: 190px; }
+.vsp-test-result {
+  grid-column: 1 / -1;
+  max-height: 360px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 8px;
+  background: #14283b;
+  color: #dcecf8;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.meeting-sync-log-panel { margin: 18px 0; padding: 15px; border: 1px solid #d5e3ef; border-radius: 12px; background: #f8fbfe; }
+.meeting-sync-log-panel > header { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+.meeting-sync-log-panel .eyebrow { margin: 0 0 4px; }
+.meeting-sync-log-panel b, .meeting-sync-log-panel small { display: block; }
+.meeting-sync-log-panel small { margin-top: 4px; color: #718095; }
+.meeting-sync-log-table-wrap { margin-top: 14px; overflow-x: auto; }
+.meeting-sync-log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.meeting-sync-log-table th, .meeting-sync-log-table td { padding: 9px; border-bottom: 1px solid #d5e3ef; text-align: left; vertical-align: top; white-space: nowrap; }
+.meeting-sync-log-table details { min-width: 80px; }
+.meeting-sync-log-table .vsp-test-result { min-width: 360px; max-height: 240px; margin-top: 8px; white-space: pre-wrap; }
+.sync-log-status { display: inline-block; padding: 2px 7px; border-radius: 999px; font-weight: 700; text-transform: capitalize; }
+.sync-log-status.is-success { color: #146c43; background: #dff5e9; }
+.sync-log-status.is-no_matches { color: #475569; background: #e8edf3; }
+.sync-log-status.is-partial { color: #8a5a00; background: #fff0bd; }
+.sync-log-status.is-failed { color: #a12622; background: #fde2e1; }
 .loading,
 .empty {
   color: #748398;
@@ -439,4 +478,11 @@ h2 {
   .topbar h1 {
     font-size: 24px;
   }
+  .vsp-action-panel { grid-template-columns: 1fr; }
+  .vsp-action-panel .vsp-date-field {
+    justify-self: stretch;
+    text-align: left;
+  }
+  .vsp-action-panel .vsp-date-field input { margin-left: 0; }
+  .vsp-action-panel .vsp-get-button { width: 100%; }
 }

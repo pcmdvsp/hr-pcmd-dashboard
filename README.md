@@ -98,7 +98,123 @@ Nút **Reset password** trên Dashboard gọi Supabase Edge Function `admin-set-
 
 ## Hybrid Realtime refresh
 
+### VSP meeting test date
+
+The Admin VSP meeting controls accept an optional calendar date. Leave it blank
+to use today in Vietnam (UTC+7). **Get VSP meeting info** synchronizes matching
+meetings. **Test VSP meeting** sends `dryRun: true`, returns the filtered JSON,
+and performs no meeting or attendee writes. The `test-vsp-meeting-info` Edge
+Function accepts `{"date":"2026-08-27","dryRun":true}` or `{}` in the POST body,
+rejects invalid dates with HTTP 400, and keeps its active-admin authentication.
+All `profiles` in this internal
+dashboard form the Ban roster; `departments` holds subteams such as Block 09-2/09,
+not a parent Ban row. A left join through `profiles.department_id` adds each
+matched person's department name without excluding leadership with a null
+department. It matches `listAttendees[].id` against corporate profile emails
+(case-insensitive, `@vietsov.com.vn` only). Inactive profiles are included for
+historical tests. If external staff are added to `profiles` in the future, introduce
+an explicit Ban membership scope before using this filter. Empty/unreadable staff
+lists remain errors. The response contains scope/date metadata, counts, and `data`: compact
+meetings with room, title, start/end timestamps and only matched dashboard
+attendees in `listAttendees`. No upstream permissions or raw response is returned.
+The observed eOffice envelope `msgBodyData: [[meetings, 0, {}]]` is read at
+`msgBodyData[0][0]`; tuple metadata is not parsed as meetings. A true
+`haveBusinessError` or `haveServerError` flag returns an error, not an empty list.
+Single meetings, arrays and unambiguous `data`/`items`/`result`
+wrappers are also supported; an unknown structure returns an error rather than a
+misleading empty result. Existing resource/date filters and upstream page size
+remain unchanged; counts refer only to meetings returned by that upstream call.
+Redeploy that function after updating; no SQL migration is needed. Run the tests
+with `node --test --test-isolation=none supabase/functions/test-vsp-meeting-info/*.test.js`.
+
+The Function now creates a fresh eOffice session for every test invocation. Store
+the test account only in Supabase Edge Function secrets as
+`VSP_EOFFICE_USERNAME` and `VSP_EOFFICE_PASSWORD`. Keep the captured stable client
+header in `VSP_EOFFICE_X_HD_TYPE`. `VSP_EOFFICE_DEVICE_JSON` is optional and may
+contain the exact non-secret device JSON observed in the browser login payload;
+when omitted, the Function derives a minimal Chrome/Windows device object from
+`VSP_EOFFICE_X_HD_TYPE`. The Function bootstraps a cookie, calls `LoginAsync`, and
+uses the returned session cookie and user token only in memory for the meeting
+request. The old manually refreshed `VSP_EOFFICE_TEST_COOKIE` and
+`VSP_EOFFICE_LVTK` secrets are no longer used. Never place the eOffice password in
+React, `.env.local`, GitHub Actions variables, logs, or source control.
+
+When a selected-day response contains meetings attended by dashboard profiles,
+the same Admin action now synchronizes them into `employee_meetings` and
+`employee_meeting_attendees`. Apply the latest `supabase_meeting_info.sql` first:
+it adds the nullable `external_source`/`external_id` identity columns, a partial
+unique index, and the authenticated Admin-only `sync_external_employee_meeting`
+RPC. The eOffice `recID` is the idempotency key. Once that external meeting exists,
+later scans report it as `unchanged` and do not update its fields, organizer, or
+attendee rows. This preserves participants added manually from the frontend. The
+attendee marked by eOffice with `roleType = "2"` is matched to a dashboard
+profile and stored as `organizer_id`. If that external organizer has no dashboard
+profile, the first matched Ban attendee is used as the required local organizer.
+For imported eOffice meetings, every current attendee can edit or cancel through
+the frontend; manually created meetings retain their organizer-only rule. Each meeting is atomic; a
+meeting attendee with `daily_status.status` equal to `leave`, `sick`, or
+`business_trip` is removed before the RPC and reported under
+`sync.skippedAttendees`. A meeting is listed under `sync.errors` only when it
+cannot be synchronized, including a database error, invalid identity/time, or no
+available attendee remaining. Other valid meetings can still synchronize. The
+automatic schedule below uses the same insert-only rules.
+
 The dashboard uses Supabase Realtime for active pages and a 30-minute fallback refresh:
+
+### VSP approved-leave diagnostic
+
+The Admin **Get VSP leave info** button invokes the authenticated
+`sync-vsp-leave` Edge Function, returns approved-leave JSON and synchronizes the
+matching records. **Test VSP leave** sends `dryRun: true` to the same Function
+and returns the same diagnostic JSON without writing `daily_status`, changing
+meetings, or creating notifications.
+The current diagnostic sends the broad list request used during the initial
+Admin can select one approval date; blank means today in Vietnam. Because VSP's
+documented UI date fields filter leave periods rather than approval time, the
+Function pages through all status-`142` records in the scoped unit and then
+matches the full selected day against `ngayKy`. It resolves the login email through `AdminDonVi`
+and sends `currentDepartmentFilter`, so VSP restricts the query to that unit
+before pagination. It deliberately omits `nguoiDuyetFilter` to avoid excluding
+other Ban employees. The response is checked again against the exact QLHĐDK
+`donVi` name, while records remain otherwise unabridged for diagnostics.
+
+The Admin test action also synchronizes every returned `thongTinPhepCTs` period
+to `daily_status` by matching VSP `danhSo` to `profiles.employee_code`. Each day
+is stored as `leave`; `noiNghiPhep` is stored in `daily_status.note`, matching the
+My Status Annual leave form's Location behavior. A bell notification is inserted
+in `status_update_notifications` once per changed period. Identical existing
+leave days are left untouched and do not generate duplicate notifications.
+Missing/inactive profiles and per-period database failures are reported in the
+Admin JSON under `sync.skipped` and `sync.errors`.
+Synced rows are marked with `daily_status.source = 'vsp'`. The updated RLS
+policies prevent normal users from inserting, editing, or deleting VSP-owned
+rows through My Status; admins retain access. Sync notifications use the content
+`Synced from VSP`. Apply the latest `supabase_schema.sql` before deploying this
+version. Cancellation status `146` is intentionally not processed yet.
+As a final defense, the diagnostic response retains only records whose `donVi`
+is exactly `Ban Quản lý các Hợp đồng Dầu khí`; an unknown response structure is
+rejected instead of returning potentially cross-unit data.
+
+Store the VSP test account in Supabase Edge Function secrets as
+`VSP_PHEP_USERNAME` and `VSP_PHEP_PASSWORD`. Never put these values in React,
+`.env.local`, logs, or source control. Deploy the Function after setting them:
+`VSP_PHEP_USERNAME` must be the complete email address used on the VSP login
+screen; the Function always uses `/api/Account/email-login` and does not accept
+an employee number or automatically append an email domain.
+
+```powershell
+supabase functions deploy sync-vsp-leave
+```
+
+Automatic VSP meeting synchronization is implemented by the separate
+`sync-vsp-meetings` Edge Function. It scans tomorrow at 18:00 Vietnam time and
+today at 11:00 Vietnam time while preserving the Admin test button. Deployment,
+Vault, and `pg_cron` setup are documented in `VSP_MEETING_SYNC_SETUP.md`.
+
+Scheduled VSP leave synchronization stores the latest operational history in
+`vsp_leave_sync_logs`. The Admin page shows the latest 20 scheduled scans;
+manual Get/Test requests are intentionally excluded. Apply the latest
+`supabase_status_notifications.sql` and redeploy `sync-vsp-leave` to enable it.
 
 - The notification bell listens for assigned meetings, cancellations, and status notifications.
 - The daily dashboard listens for changes to the selected date.
@@ -107,6 +223,17 @@ The dashboard uses Supabase Realtime for active pages and a 30-minute fallback r
 - Monthly Statistics and the monthly timeline refresh every 30 minutes while open.
 
 For an existing Supabase project, rerun [`supabase_status_notifications.sql`](./supabase_status_notifications.sql) after deploying this version. Its idempotent publication block adds the required tables to `supabase_realtime`.
+
+### Approved business-trip PDF import
+
+Authenticated users can preview an approved VSP business-trip PDF in My Status
+and confirm it for every active PCMD profile detected by employee code. Confirmed
+documents overwrite `daily_status` for the departure-to-return date range and
+create one status notification marked `Synced from approved VSP PDF`. Back-up
+employees remain visible in the preview but are not imported. File SHA-256 is
+stored in `vsp_business_trip_imports` so confirming the same PDF again is
+idempotent. Apply the latest `supabase_status_notifications.sql` before using the
+Confirm button.
 
 ## Build production
 

@@ -7,6 +7,11 @@ import './MeetingNotifications.css'
 const formatDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).format(new Date(`${value}T12:00:00`))
 const formatTime = value => value ? String(value).slice(0, 5) : 'Time not set'
 const statusLabel = { business_trip: 'Business trip', leave: 'Annual leave', sick: 'Sick leave' }
+const PDF_SYNC_LABEL = 'Synced from approved VSP PDF'
+const isPdfSyncNotification = notification => notification.status === 'business_trip' && notification.content?.endsWith(PDF_SYNC_LABEL)
+const statusContent = notification => isPdfSyncNotification(notification)
+  ? notification.content.slice(0, -PDF_SYNC_LABEL.length).trim()
+  : notification.content
 const statusDateRange = notification => notification.start_date && notification.end_date
   ? `From: ${formatDate(notification.start_date)} – To: ${formatDate(notification.end_date)}`
   : 'Date range not available'
@@ -18,7 +23,7 @@ const meetingDateTime = notification => {
   return `${formatDate(notification.kind === 'cancelled' ? notification.meeting_date : notification.date)} · ${formatTime(notification.start_time)} – ${formatTime(notification.end_time)}`
 }
 
-export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) {
+export default function MeetingNotifications({ employeeId, onOpenMeetingInfo, readOnly = false }) {
   const [meetings, setMeetings] = useState([])
   const [views, setViews] = useState([])
   const [cancellations, setCancellations] = useState([])
@@ -47,10 +52,12 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
     if (attendeeResult.error || viewResult.error || cancellationResult.error || statusResult.error || statusReadResult.error) return
     const ids = (attendeeResult.data || []).map(item => item.meeting_id)
     const meetingResult = ids.length
-      ? await supabase.from('employee_meetings').select('id,date,start_time,end_time,content,location,updated_at,recurrence_id,recurrence_rule,recurrence_until').in('id', ids).order('date').order('start_time')
+      ? await supabase.from('employee_meetings').select('id,date,start_time,end_time,content,location,updated_at,recurrence_id,recurrence_rule,recurrence_until,external_source').in('id', ids).order('date').order('start_time')
       : { data: [], error: null }
     if (meetingResult.error) return
-    const statusUpdates = statusResult.data || []
+    const statusUpdates = (statusResult.data || []).filter(item =>
+      item.employee_id === employeeId || (item.participant_ids || []).includes(employeeId)
+    )
     const statusEmployeeIds = [...new Set(statusUpdates.flatMap(item => [item.employee_id, ...(item.participant_ids || [])]))]
     const employeeResult = statusEmployeeIds.length
       ? await supabase.from('profiles').select('id,full_name').in('id', statusEmployeeIds)
@@ -140,6 +147,7 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
   const unreadCount = useMemo(() => notifications.filter(notification => notification.isNew).length, [notifications])
 
   const openNotification = async notification => {
+    if (readOnly) return
     if (notification.kind === 'status') {
       const result = await supabase.from('status_update_notification_reads').upsert({ notification_id: notification.id, employee_id: employeeId }, { onConflict: 'notification_id,employee_id' })
       if (!result.error) setStatusReads(current => current.some(item => item.notification_id === notification.id) ? current : [...current, { notification_id: notification.id }])
@@ -175,9 +183,10 @@ export default function MeetingNotifications({ employeeId, onOpenMeetingInfo }) 
     </button>
     {open && <section className="notification-panel" aria-label="Notifications">
       <header><strong>Notifications</strong><span>{unreadCount} new</span></header>
-      {pushSupported() && <button type="button" className="notification-enable-push" onClick={enablePush} disabled={browserRegistered}>{browserRegistered ? 'Browser notifications registered' : Notification.permission === 'granted' ? 'Register this browser for notifications' : 'Enable browser notifications'}</button>}
+      {readOnly && <p className="notification-preview-note">Read-only preview — notifications will not be marked as read.</p>}
+      {!readOnly && pushSupported() && <button type="button" className="notification-enable-push" onClick={enablePush} disabled={browserRegistered}>{browserRegistered ? 'Browser notifications registered' : Notification.permission === 'granted' ? 'Register this browser for notifications' : 'Enable browser notifications'}</button>}
       {pushMessage && <p className="notification-push-message">{pushMessage}</p>}
-      {notifications.length ? <div className="notification-list">{notifications.map(notification => <button type="button" className={`notification-item ${notification.kind === 'cancelled' ? 'is-cancelled' : ''} ${notification.kind === 'status' ? 'is-status-update' : ''}`} key={`${notification.kind}-${notification.recurrence_id || notification.id}`} onClick={() => openNotification(notification)}>{notification.kind === 'status' ? <>{notification.action === 'removed' ? <b>{notification.full_name} removed {statusLabel[notification.status]} out of this status.</b> : <b>{notification.full_name} updated his status{notification.status === 'business_trip' && notification.participant_names?.length ? ` and ${notification.participant_names.join(', ')}` : ''} to {statusLabel[notification.status]}.</b>}<span>{statusDateRange(notification)}</span>{notification.action !== 'removed' && notification.status === 'business_trip' && <><small>Content: {notification.content || 'Not specified'}</small><small>Location: {notification.location || 'Not specified'}</small></>}{notification.action !== 'removed' && notification.status === 'leave' && <small>Location: {notification.location || 'Not specified'}</small>}</> : <><b>{notification.kind === 'cancelled' ? `Canceled: ${notification.content}` : notification.content || 'Meeting'}</b><span>{meetingDateTime(notification)}</span><small>{notification.location || 'Location not specified'}</small></>}{notification.isNew && <em className="notification-new-tag">New</em>}</button>)}</div> : <p>No notifications yet.</p>}
+      {notifications.length ? <div className="notification-list">{notifications.map(notification => <button type="button" className={`notification-item ${notification.kind === 'cancelled' ? 'is-cancelled' : ''} ${notification.kind === 'status' ? 'is-status-update' : ''}`} key={`${notification.kind}-${notification.recurrence_id || notification.id}`} onClick={() => openNotification(notification)}>{notification.kind === 'status' ? <>{notification.action === 'removed' ? <b>{notification.full_name} removed {statusLabel[notification.status]} out of this status.</b> : <b>{notification.full_name} updated his status{notification.status === 'business_trip' && notification.participant_names?.length ? ` and ${notification.participant_names.join(', ')}` : ''} to {statusLabel[notification.status]}.</b>}<span>{statusDateRange(notification)}</span>{notification.action !== 'removed' && notification.status === 'business_trip' && <><small>Content: {statusContent(notification) || 'Not specified'}</small><small>Location: {notification.location || 'Not specified'}</small>{isPdfSyncNotification(notification) && <strong className="notification-sync-source">{PDF_SYNC_LABEL}</strong>}</>}{notification.action !== 'removed' && notification.status === 'leave' && <>{notification.content && notification.content !== 'Synced from VSP' && <small>{notification.content}</small>}<small>Location: {notification.location || 'Not specified'}</small>{notification.content === 'Synced from VSP' && <strong className="notification-sync-source">Synced from VSP</strong>}</>}</> : <><b>{notification.kind === 'cancelled' ? `Canceled: ${notification.content}` : notification.content || 'Meeting'}</b><span>{meetingDateTime(notification)}</span><small>{notification.location || 'Location not specified'}</small>{notification.kind === 'meeting' && notification.external_source === 'vsp_eoffice' && <strong className="notification-sync-source">Synced from VSP</strong>}</>}{notification.isNew && <em className="notification-new-tag">New</em>}</button>)}</div> : <p>No notifications yet.</p>}
     </section>}
   </div>
 }

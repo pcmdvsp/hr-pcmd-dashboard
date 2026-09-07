@@ -5,6 +5,7 @@ import { getUnavailableMeetingParticipantsByDate } from "../utils/meetingAvailab
 import { showRoomReservationAlert } from "./RoomReservationAlert";
 import { showSuccessAlert } from "./SuccessAlert";
 import { notifyMeetingPush } from "../utils/pushNotifications";
+import BusinessTripPdfImport from "./BusinessTripPdfImport";
 import "./OvertimeConfirmDialog.css";
 
 const KNT_MEETING_ROOM = "KNT meeting room";
@@ -74,6 +75,7 @@ export default function StatusForm({
   const [selectedIds, setSelectedIds] = useState([]);
   const [tripParticipantQuery, setTripParticipantQuery] = useState("");
   const [tripParticipantIds, setTripParticipantIds] = useState([]);
+  const [businessTripEntryMethod, setBusinessTripEntryMethod] = useState("manual");
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [selectedTripDepartment, setSelectedTripDepartment] = useState(null);
   const [unavailable, setUnavailable] = useState(new Map());
@@ -381,6 +383,7 @@ export default function StatusForm({
 
   const submit = async (event) => {
     event.preventDefault();
+    if (status === "business_trip" && businessTripEntryMethod === "pdf") return;
     // React disables the button on the next render. This synchronous guard
     // also blocks a second click/Enter event in the same render frame.
     if (submitInFlight.current) return;
@@ -409,6 +412,23 @@ export default function StatusForm({
     if (status === "meeting" && endTime < startTime) {
       setSaving(false);
       return setError("The end time must not be earlier than the start time.");
+    }
+    if (!canEditHistory && dates.length) {
+      const protectedResult = await supabase
+        .from("daily_status")
+        .select("date")
+        .eq("employee_id", employee.id)
+        .eq("source", "vsp")
+        .in("date", dates)
+        .limit(1);
+      if (protectedResult.error) {
+        setSaving(false);
+        return setError(protectedResult.error.message);
+      }
+      if (protectedResult.data?.length) {
+        setSaving(false);
+        return setError("Synced from VSP status cannot be changed in My Status.");
+      }
     }
     if ((status === "working" || status === "meeting") && !overtimeApproved) {
       const calendarResult = await supabase
@@ -712,12 +732,17 @@ export default function StatusForm({
           ))}
         </select>
       </label>
-      {status === "meeting" ? <>
+      {status === "business_trip" && <div className="business-trip-entry-method" role="group" aria-label="Business trip entry method">
+        <button type="button" className={businessTripEntryMethod === "manual" ? "is-selected" : ""} aria-pressed={businessTripEntryMethod === "manual"} onClick={() => setBusinessTripEntryMethod("manual")}>Enter manually</button>
+        <button type="button" className={businessTripEntryMethod === "pdf" ? "is-selected" : ""} aria-pressed={businessTripEntryMethod === "pdf"} onClick={() => setBusinessTripEntryMethod("pdf")}>Import approved PDF</button>
+      </div>}
+      {status === "business_trip" && businessTripEntryMethod === "pdf" && <BusinessTripPdfImport onSaved={onSaved} />}
+      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && (status === "meeting" ? <>
         <label>Date<input required type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); setEndDate(event.target.value); markChanged(); }} /></label>
       </> : <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
         <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged(); }} /></label>
         <label>To date<input type="date" min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); markChanged(); }} /></label>
-      </div>}
+      </div>)}
       {status === "leave" && <>
         {additionalLeaveRanges.map((range, index) => <div className="date-range leave-date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }} key={`${index}-${range.startDate}`}>
           <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={range.startDate} onChange={(event) => updateLeaveRange(index, "startDate", event.target.value)} /></label>
@@ -898,7 +923,7 @@ export default function StatusForm({
           )}
         </>
       )}
-      {status === "business_trip" && !onClose && (
+      {status === "business_trip" && businessTripEntryMethod === "manual" && !onClose && (
         <>
           <label>
             Add colleagues to this business trip{" "}
@@ -1015,7 +1040,7 @@ export default function StatusForm({
           )}
         </>
       )}
-      {needsDetails ? (
+      {needsDetails && !(status === "business_trip" && businessTripEntryMethod === "pdf") ? (
         <>
           <label>
             Content
@@ -1146,9 +1171,9 @@ export default function StatusForm({
           </section>
         </div>
       )}
-      <button className="primary-button" disabled={saving}>
+      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && <button className="primary-button" disabled={saving}>
         {saving ? "Saving..." : saved ? "Saved" : "Save status"}
-      </button>
+      </button>}
     </form>
   );
 }

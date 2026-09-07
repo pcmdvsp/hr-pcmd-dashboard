@@ -80,6 +80,11 @@ alter table public.employee_meetings add column if not exists online_link text;
 alter table public.employee_meetings add column if not exists recurrence_id uuid;
 alter table public.employee_meetings add column if not exists recurrence_rule text check (recurrence_rule in ('weekly'));
 alter table public.employee_meetings add column if not exists recurrence_until date;
+alter table public.employee_meetings add column if not exists external_source text;
+alter table public.employee_meetings add column if not exists external_id text;
+create unique index if not exists employee_meetings_external_source_id_key
+  on public.employee_meetings(external_source, external_id)
+  where external_source is not null and external_id is not null;
 create index if not exists employee_meetings_recurrence_idx on public.employee_meetings(recurrence_id, date)
   where recurrence_id is not null;
 
@@ -147,23 +152,174 @@ create trigger employee_meetings_updated before update on public.employee_meetin
 
 alter table public.employee_meetings enable row level security;
 alter table public.employee_meeting_attendees enable row level security;
+
+-- Imported eOffice meetings may have an external organizer who has no local
+-- profile. Every current attendee may therefore manage that imported meeting.
+-- SECURITY DEFINER avoids recursive attendee-table RLS checks.
+create or replace function public.can_manage_employee_meeting(p_meeting_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.employee_meetings m
+    where m.id = p_meeting_id
+      and (
+        m.organizer_id = auth.uid()
+        or (
+          m.external_source = 'vsp_eoffice'
+          and exists (
+            select 1 from public.employee_meeting_attendees a
+            where a.meeting_id = m.id and a.employee_id = auth.uid()
+          )
+        )
+      )
+  );
+$$;
+revoke all on function public.can_manage_employee_meeting(uuid) from public;
+grant execute on function public.can_manage_employee_meeting(uuid) to authenticated;
+
 drop policy if exists "employee meetings readable" on public.employee_meetings;
 drop policy if exists "organizers manage employee meetings" on public.employee_meetings;
 create policy "employee meetings readable" on public.employee_meetings for select to authenticated using (true);
 create policy "organizers manage employee meetings" on public.employee_meetings for all to authenticated
-  using (public.is_admin() or organizer_id = auth.uid())
-  with check (public.is_admin() or organizer_id = auth.uid());
+  using (public.is_admin() or public.can_manage_employee_meeting(id))
+  with check (public.is_admin() or organizer_id = auth.uid() or public.can_manage_employee_meeting(id));
 drop policy if exists "employee meeting attendees readable" on public.employee_meeting_attendees;
 drop policy if exists "organizers manage employee meeting attendees" on public.employee_meeting_attendees;
 create policy "employee meeting attendees readable" on public.employee_meeting_attendees for select to authenticated using (true);
 create policy "organizers manage employee meeting attendees" on public.employee_meeting_attendees for all to authenticated
-  using (public.is_admin() or exists (select 1 from public.employee_meetings m where m.id = meeting_id and m.organizer_id = auth.uid()))
-  with check (public.is_admin() or exists (select 1 from public.employee_meetings m where m.id = meeting_id and m.organizer_id = auth.uid()));
+  using (public.is_admin() or public.can_manage_employee_meeting(meeting_id))
+  with check (public.is_admin() or public.can_manage_employee_meeting(meeting_id));
+
+-- Imported meeting attendees can use the existing frontend cancellation flow.
+drop policy if exists "organizers create meeting cancellations" on public.employee_meeting_cancellations;
+create policy "organizers create meeting cancellations" on public.employee_meeting_cancellations
+  for insert to authenticated
+  with check (public.is_admin() or public.can_manage_employee_meeting(meeting_id));
 -- A participant may remove only their own attendance when another status
 -- (business trip, annual leave, or sick leave) replaces their Meeting.
 drop policy if exists "participants leave employee meetings" on public.employee_meeting_attendees;
 create policy "participants leave employee meetings" on public.employee_meeting_attendees for delete to authenticated
   using (employee_id = auth.uid() or public.is_admin());
+
+-- Atomically inserts or updates one meeting imported from an external system,
+-- then makes its attendee rows exactly match the supplied dashboard profiles.
+-- The caller remains subject to the table RLS policies and must be an admin.
+create or replace function public.sync_external_employee_meeting(
+  p_external_source text,
+  p_external_id text,
+  p_organizer_id uuid,
+  p_date date,
+  p_content text,
+  p_location text,
+  p_start_time time,
+  p_end_time time,
+  p_attendee_ids uuid[]
+)
+returns table(meeting_id uuid, was_created boolean)
+language plpgsql
+set search_path = public
+as $$
+declare
+  v_meeting_id uuid;
+begin
+  if auth.role() <> 'service_role' and not public.is_admin() then
+    raise exception 'Only an administrator or the scheduler can sync external meetings';
+  end if;
+  if nullif(trim(p_external_source), '') is null or nullif(trim(p_external_id), '') is null then
+    raise exception 'External source and ID are required';
+  end if;
+  if coalesce(array_length(p_attendee_ids, 1), 0) = 0 then
+    raise exception 'At least one attendee is required';
+  end if;
+
+  select m.id into v_meeting_id
+  from public.employee_meetings m
+  where m.external_source = p_external_source and m.external_id = p_external_id;
+  if v_meeting_id is not null then
+    meeting_id := v_meeting_id;
+    was_created := false;
+    return next;
+    return;
+  end if;
+
+  insert into public.employee_meetings(
+    organizer_id, date, content, location, start_time, end_time,
+    external_source, external_id
+  ) values (
+    p_organizer_id, p_date, p_content, p_location, p_start_time, p_end_time,
+    p_external_source, p_external_id
+  )
+  on conflict (external_source, external_id)
+    where external_source is not null and external_id is not null
+  do nothing
+  returning id into v_meeting_id;
+
+  -- Another scan may have inserted the same external meeting concurrently.
+  -- In that case return it unchanged and never replace its attendee list.
+  if v_meeting_id is null then
+    select m.id into v_meeting_id
+    from public.employee_meetings m
+    where m.external_source = p_external_source and m.external_id = p_external_id;
+    meeting_id := v_meeting_id;
+    was_created := false;
+    return next;
+    return;
+  end if;
+
+  insert into public.employee_meeting_attendees(meeting_id, employee_id)
+  select v_meeting_id, attendee_id
+  from unnest(p_attendee_ids) attendee_id
+  on conflict do nothing;
+
+  meeting_id := v_meeting_id;
+  was_created := true;
+  return next;
+end;
+$$;
+
+revoke all on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) from public;
+grant execute on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) to authenticated;
+grant execute on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) to service_role;
+
+-- Operational history for automatic eOffice meeting scans. This intentionally
+-- stores counts and safe error summaries only, never credentials or session data.
+create table if not exists public.vsp_meeting_sync_logs (
+  id uuid primary key default gen_random_uuid(),
+  run_type text not null default 'scheduled' check (run_type in ('scheduled', 'manual')),
+  mode text not null check (mode in ('today', 'tomorrow', 'in2days', 'in3days')),
+  target_date date not null,
+  status text not null check (status in ('success', 'no_matches', 'partial', 'failed')),
+  upstream_meeting_count integer not null default 0 check (upstream_meeting_count >= 0),
+  matched_meeting_count integer not null default 0 check (matched_meeting_count >= 0),
+  created_count integer not null default 0 check (created_count >= 0),
+  unchanged_count integer not null default 0 check (unchanged_count >= 0),
+  failed_count integer not null default 0 check (failed_count >= 0),
+  skipped_attendees jsonb not null default '[]'::jsonb,
+  errors jsonb not null default '[]'::jsonb,
+  started_at timestamptz not null,
+  finished_at timestamptz not null,
+  duration_ms integer not null check (duration_ms >= 0),
+  created_at timestamptz not null default now()
+);
+create index if not exists vsp_meeting_sync_logs_started_idx
+  on public.vsp_meeting_sync_logs(started_at desc);
+alter table public.vsp_meeting_sync_logs
+  drop constraint if exists vsp_meeting_sync_logs_mode_check;
+alter table public.vsp_meeting_sync_logs
+  add constraint vsp_meeting_sync_logs_mode_check
+  check (mode in ('today', 'tomorrow', 'in2days', 'in3days'));
+alter table public.vsp_meeting_sync_logs enable row level security;
+drop policy if exists "admins read VSP meeting sync logs" on public.vsp_meeting_sync_logs;
+create policy "admins read VSP meeting sync logs" on public.vsp_meeting_sync_logs
+  for select to authenticated using (public.is_admin());
+revoke all on table public.vsp_meeting_sync_logs from anon, authenticated;
+grant select on table public.vsp_meeting_sync_logs to authenticated;
+grant all on table public.vsp_meeting_sync_logs to service_role;
 
 -- Database-level protection: an employee on business trip, annual leave, or
 -- sick leave can organize a meeting but cannot be inserted as its attendee.

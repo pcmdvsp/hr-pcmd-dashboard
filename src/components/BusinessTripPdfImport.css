@@ -1,0 +1,35 @@
+.business-trip-entry-method { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.business-trip-entry-method button { width: 100%; border: 1px solid #cad8e5; border-radius: 10px; padding: 11px 12px; background: #fff; color: #40566e; font-weight: 700; cursor: pointer; }
+.business-trip-entry-method button.is-selected { border-color: #2879bd; background: #eaf4fc; color: #11588e; box-shadow: inset 0 0 0 1px #2879bd; }
+.business-trip-import-card { display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: center; margin-top: 14px; padding: 16px; border: 1px solid #dce7f0; border-radius: 12px; background: #f8fbfe; color: #24435f; }
+.business-trip-import-card p { margin: 4px 0 0; }
+.business-trip-pdf-backdrop { z-index: 30; }
+.business-trip-pdf-modal { width: min(760px, 100%); background: #fff; padding: 22px; }
+.business-trip-file-input { display: none !important; }
+.business-trip-file-picker { width: 100%; display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 18px; border: 1px dashed #8eabc2; border-radius: 12px; background: #f7fbfe; color: #24435f; text-align: left; cursor: pointer; }
+.business-trip-file-picker span { display: grid; gap: 3px; min-width: 0; }
+.business-trip-file-picker strong { overflow: hidden; text-overflow: ellipsis; }
+.business-trip-file-picker small { color: #6b7f91; }
+.business-trip-pdf-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+.business-trip-preview { margin-top: 22px; border-top: 1px solid #dce7f0; padding-top: 18px; }
+.business-trip-preview-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.business-trip-preview-heading h3 { margin: 2px 0 0; }
+.business-trip-preview-heading > span { padding: 5px 9px; border-radius: 999px; background: #edf3f8; color: #536a7f; font-size: 12px; }
+.business-trip-warnings { margin-top: 14px; padding: 12px 14px; border-radius: 10px; background: #fff7e2; color: #755716; font-size: 13px; }
+.business-trip-warnings ul { margin: 6px 0 0; padding-left: 20px; }
+.business-trip-summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.business-trip-summary div { padding: 11px 12px; border-radius: 9px; background: #f5f8fb; }
+.business-trip-summary dt { color: #6b7f91; font-size: 12px; }
+.business-trip-summary dd { margin: 4px 0 0; color: #243d55; font-weight: 600; overflow-wrap: anywhere; }
+.business-trip-preview-table-wrap { max-height: 280px; overflow: auto; border: 1px solid #dce7f0; border-radius: 10px; }
+.business-trip-preview-table { width: 100%; border-collapse: collapse; }
+.business-trip-preview-table th, .business-trip-preview-table td { padding: 9px 12px; border-bottom: 1px solid #e6edf3; text-align: left; }
+.business-trip-preview-table th { position: sticky; top: 0; background: #f4f8fb; color: #536a7f; font-size: 12px; }
+.business-trip-preview-note { margin: 14px 0 0; color: #6b7f91; font-size: 12px; }
+.business-trip-confirm-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
+.business-trip-import-success { display: grid; gap: 3px; margin-top: 14px; padding: 12px 14px; border: 1px solid #b8dec8; border-radius: 10px; background: #edf9f2; color: #24613d; }
+.business-trip-import-success span { font-size: 13px; }
+.business-trip-participant-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 8px; }
+.business-trip-participant-heading h4 { margin: 0; }
+.business-trip-participant-heading span { color: #6b7f91; font-size: 12px; }
+@media (max-width: 640px) { .business-trip-entry-method, .business-trip-summary { grid-template-columns: 1fr; } .business-trip-import-card { grid-template-columns: auto 1fr; } .business-trip-import-card .primary-button { grid-column: 1 / -1; width: 100%; } .business-trip-pdf-modal { padding: 17px; } }

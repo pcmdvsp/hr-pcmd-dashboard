@@ -42,7 +42,7 @@ export function useDashboard(selectedDate = today(), userId) {
       ? Promise.resolve({ data: cachedStatuses, error: null })
       : supabase
           .from('daily_status')
-          .select('employee_id,date,status,note,content,location,start_time,end_time,is_overtime,updated_at')
+          .select('employee_id,date,status,note,content,location,start_time,end_time,is_overtime,source,updated_at')
           .gte('date', statusMonth.start)
           .lt('date', statusMonth.end)
     const [profileRes, statusRes, deptRes, calendarRes, meetingRes] = await Promise.all([

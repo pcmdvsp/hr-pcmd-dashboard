@@ -63,8 +63,8 @@ export default function MeetingInfoPage({ profile, goBack }) {
     setLoading(true);
     setError("");
     const meetingQuery = viewMode === "week"
-      ? supabase.from("employee_meetings").select("id,organizer_id,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").gte("date", startOfWeek(date)).lte("date", moveDate(startOfWeek(date), 13)).order("date").order("start_time")
-      : supabase.from("employee_meetings").select("id,organizer_id,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").eq("date", date).order("start_time");
+      ? supabase.from("employee_meetings").select("id,organizer_id,external_source,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").gte("date", startOfWeek(date)).lte("date", moveDate(startOfWeek(date), 13)).order("date").order("start_time")
+      : supabase.from("employee_meetings").select("id,organizer_id,external_source,recurrence_id,recurrence_rule,recurrence_until,date,content,location,online_link,start_time,end_time").eq("date", date).order("start_time");
     const [meetingResult, employeeResult, departmentResult] = await Promise.all(
       [
         meetingQuery,
@@ -174,7 +174,11 @@ export default function MeetingInfoPage({ profile, goBack }) {
   }, [meetings, attendees, employeeById, departmentById]);
 
   const canEdit = (meeting) =>
-    meeting.organizer_id === profile.id || profile.role === "admin";
+    meeting.organizer_id === profile.id ||
+    profile.role === "admin" ||
+    (meeting.external_source === "vsp_eoffice" && attendees.some(
+      (attendee) => attendee.meeting_id === meeting.id && attendee.employee_id === profile.id,
+    ));
   const selectedAttendeeIds = editing
     ? attendees
         .filter((attendee) => attendee.meeting_id === editing.id)
