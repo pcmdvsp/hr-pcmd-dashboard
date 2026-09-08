@@ -21,7 +21,14 @@ export default function ResetPasswordDialog({ employees, onClose }) {
     setSaving(true); setError(''); setSuccess('')
     const result = await supabase.functions.invoke('admin-set-password', { body: { email: normalizedEmail, password } })
     setSaving(false)
-    if (result.error) return setError(result.error.message || 'Unable to set the password.')
+    if (result.error) {
+      let message = result.error.message || 'Unable to set the password.'
+      try {
+        const payload = await result.error.context?.json()
+        if (payload?.error) message = payload.error
+      } catch { /* Keep the Supabase client error when no JSON body is available. */ }
+      return setError(message)
+    }
     setPassword(''); setConfirmPassword('')
     setSuccess(`A temporary password has been set for ${normalizedEmail}. The user must change it after signing in.`)
   }

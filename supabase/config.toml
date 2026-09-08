@@ -1,7 +1,8 @@
 [functions.admin-set-password]
-# Password management is sensitive: the Supabase gateway must reject callers
-# without a valid signed-in user JWT before this Function starts.
-verify_jwt = true
+# The handler validates the caller JWT with auth.getUser(), then checks the
+# active Admin profile before using the service-role client. Keeping gateway
+# verification off supports projects using the newer JWT signing-key format.
+verify_jwt = false
 
 [functions.send-push-notification]
 verify_jwt = true
