@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
-export default function ResetPasswordDialog({ employees, onClose }) {
+export default function ResetPasswordDialog({ onClose }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -12,13 +12,20 @@ export default function ResetPasswordDialog({ employees, onClose }) {
   const submit = async event => {
     event.preventDefault()
     const normalizedEmail = email.trim().toLowerCase()
-    const employee = employees.find(item => item.email.trim().toLowerCase() === normalizedEmail)
-    if (!employee) return setError('No active employee was found with this email address.')
-    if (employee.role !== 'normal') return setError('This feature is available only for normal user accounts.')
     if (password.length < 8) return setError('Password must be at least 8 characters.')
     if (password !== confirmPassword) return setError('Password confirmation does not match.')
 
     setSaving(true); setError(''); setSuccess('')
+    const { data: employeeProfiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id,email,role,active')
+      .limit(5000)
+    if (profileError) { setSaving(false); return setError(`Unable to check the employee profile: ${profileError.message}`) }
+    const employee = (employeeProfiles || []).find(profile => String(profile.email || '').trim().toLowerCase() === normalizedEmail)
+    if (!employee) { setSaving(false); return setError('No employee profile was found with this email address.') }
+    if (!employee.active) { setSaving(false); return setError('This employee profile is inactive. Activate it before resetting the password.') }
+    if (employee.role !== 'normal') { setSaving(false); return setError('This feature is available only for normal user accounts.') }
+
     const result = await supabase.functions.invoke('admin-set-password', { body: { email: normalizedEmail, password } })
     setSaving(false)
     if (result.error) {

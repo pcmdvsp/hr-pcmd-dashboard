@@ -66,6 +66,6 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
       <section className="department-grid">{visibleDepartments.map(department => <DepartmentCard key={department.id} department={department} employees={department.employees}/>)}</section>
       {visible.length === 0 && <div className="dashboard-empty"><span>◌</span><p>No matching employees found.</p></div>}
     </>}
-    {resetPassword && <ResetPasswordDialog employees={employees} onClose={() => setResetPassword(false)} />}
+    {resetPassword && <ResetPasswordDialog onClose={() => setResetPassword(false)} />}
   </main>
 }

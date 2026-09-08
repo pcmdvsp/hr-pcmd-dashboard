@@ -55,8 +55,11 @@ Deno.serve(async request => {
   if (!email || !email.includes('@')) return response({ error: 'A valid employee email is required.' }, 400)
   if (password.length < 8) return response({ error: 'Password must be at least 8 characters.' }, 400)
 
-  const { data: employee, error: employeeError } = await adminClient
-    .from('profiles').select('id,role,active').eq('email', email).maybeSingle()
+  const { data: employeeProfiles, error: employeeError } = await adminClient
+    .from('profiles').select('id,email,role,active').limit(5000)
+  const employee = (employeeProfiles ?? []).find(profile =>
+    String(profile.email ?? '').trim().toLowerCase() === email
+  )
   if (employeeError || !employee || !employee.active) return response({ error: 'No active employee was found with this email address.' }, 404)
   if (employee.role !== 'normal') return response({ error: 'This feature is available only for normal user accounts.' }, 400)
 
