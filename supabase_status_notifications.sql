@@ -362,6 +362,150 @@ revoke all on table public.vsp_leave_sync_logs from anon, authenticated;
 grant select on table public.vsp_leave_sync_logs to authenticated;
 grant all on table public.vsp_leave_sync_logs to service_role;
 
+-- Approved compensatory-leave PDFs are imported only by the employee named in
+-- the document. The hash makes repeated imports idempotent.
+create table if not exists public.vsp_compensatory_leave_imports (
+  id uuid primary key default gen_random_uuid(),
+  file_hash text not null unique,
+  file_name text not null,
+  uploaded_by uuid not null references public.profiles(id) on delete restrict,
+  employee_id uuid not null references public.profiles(id) on delete restrict,
+  employee_code text not null,
+  date_ranges jsonb not null,
+  location text not null,
+  status_row_count integer not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.vsp_compensatory_leave_imports enable row level security;
+drop policy if exists "users read own compensatory leave imports" on public.vsp_compensatory_leave_imports;
+create policy "users read own compensatory leave imports"
+  on public.vsp_compensatory_leave_imports for select to authenticated
+  using (employee_id = auth.uid() or public.is_admin());
+revoke all on table public.vsp_compensatory_leave_imports from anon, authenticated;
+grant select on table public.vsp_compensatory_leave_imports to authenticated;
+
+create or replace function public.import_own_compensatory_leave_pdf(
+  p_employee_code text,
+  p_start_dates date[],
+  p_end_dates date[],
+  p_location text,
+  p_file_name text,
+  p_file_hash text
+) returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_profile public.profiles%rowtype;
+  existing_import public.vsp_compensatory_leave_imports%rowtype;
+  import_id uuid;
+  range_index integer;
+  affected_rows integer;
+  total_status_rows integer := 0;
+  range_start date;
+  range_end date;
+begin
+  if auth.uid() is null then raise exception 'Authentication is required'; end if;
+  select * into current_profile from public.profiles
+  where id = auth.uid() and active = true;
+  if not found then raise exception 'An active authenticated profile is required'; end if;
+  if coalesce(trim(p_employee_code), '') <> trim(current_profile.employee_code) then
+    raise exception 'You can import only your own approved compensatory leave PDF';
+  end if;
+  if coalesce(cardinality(p_start_dates), 0) = 0
+     or cardinality(p_start_dates) <> cardinality(p_end_dates)
+     or cardinality(p_start_dates) > 50 then
+    raise exception 'Invalid compensatory leave date ranges';
+  end if;
+  if coalesce(trim(p_location), '') = '' then raise exception 'Leave location is required'; end if;
+  if coalesce(trim(p_file_name), '') = '' or p_file_hash !~ '^[0-9a-f]{64}$' then
+    raise exception 'Valid PDF file metadata is required';
+  end if;
+
+  select * into existing_import from public.vsp_compensatory_leave_imports
+  where file_hash = p_file_hash;
+  if found then
+    if existing_import.employee_id <> auth.uid() then
+      raise exception 'This approved PDF has already been imported by another user';
+    end if;
+    return jsonb_build_object(
+      'success', true, 'alreadyImported', true, 'importId', existing_import.id,
+      'statusRowCount', existing_import.status_row_count
+    );
+  end if;
+
+  for range_index in 1..cardinality(p_start_dates) loop
+    range_start := p_start_dates[range_index];
+    range_end := p_end_dates[range_index];
+    if range_start is null or range_end is null or range_end < range_start
+       or range_end - range_start > 366 then
+      raise exception 'Invalid compensatory leave date range at position %', range_index;
+    end if;
+  end loop;
+
+  insert into public.vsp_compensatory_leave_imports (
+    file_hash, file_name, uploaded_by, employee_id, employee_code, date_ranges, location
+  ) values (
+    p_file_hash, trim(p_file_name), auth.uid(), auth.uid(), trim(p_employee_code),
+    (select jsonb_agg(jsonb_build_object('startDate', p_start_dates[i], 'endDate', p_end_dates[i]) order by i)
+     from generate_subscripts(p_start_dates, 1) i),
+    trim(p_location)
+  ) returning id into import_id;
+
+  for range_index in 1..cardinality(p_start_dates) loop
+    range_start := p_start_dates[range_index];
+    range_end := p_end_dates[range_index];
+
+    delete from public.employee_meetings
+    where organizer_id = auth.uid() and date between range_start and range_end;
+    delete from public.employee_meeting_attendees attendee
+    using public.employee_meetings meeting
+    where attendee.meeting_id = meeting.id
+      and attendee.employee_id = auth.uid()
+      and meeting.date between range_start and range_end;
+
+    insert into public.daily_status (
+      employee_id, date, status, is_overtime, note, content, location, start_time, end_time, source
+    )
+    select auth.uid(), day::date, 'leave', false, trim(p_location), null, null, null, null, 'vsp'
+    from generate_series(range_start, range_end, interval '1 day') day
+    on conflict (employee_id, date) do update set
+      status = 'leave', is_overtime = false, note = excluded.note,
+      content = null, location = null, start_time = null, end_time = null, source = 'vsp';
+    get diagnostics affected_rows = row_count;
+    total_status_rows := total_status_rows + affected_rows;
+
+    insert into public.status_update_notifications (
+      employee_id, status, start_date, end_date, content, location
+    ) values (
+      auth.uid(), 'leave', range_start, range_end,
+      'Synced from approved VSP PDF', trim(p_location)
+    );
+  end loop;
+
+  update public.vsp_compensatory_leave_imports
+  set status_row_count = total_status_rows where id = import_id;
+  return jsonb_build_object(
+    'success', true, 'alreadyImported', false, 'importId', import_id,
+    'statusRowCount', total_status_rows
+  );
+exception
+  when unique_violation then
+    select * into existing_import from public.vsp_compensatory_leave_imports
+    where file_hash = p_file_hash;
+    if existing_import.employee_id <> auth.uid() then
+      raise exception 'This approved PDF has already been imported by another user';
+    end if;
+    return jsonb_build_object(
+      'success', true, 'alreadyImported', true, 'importId', existing_import.id,
+      'statusRowCount', existing_import.status_row_count
+    );
+end;
+$$;
+revoke all on function public.import_own_compensatory_leave_pdf(text, date[], date[], text, text, text) from public;
+grant execute on function public.import_own_compensatory_leave_pdf(text, date[], date[], text, text, text) to authenticated;
+
 -- Edit one continuous status block from the monthly timeline. Normal users can
 -- change only their own records from today onward; admins retain history access.
 -- Deleting the explicit rows makes each date fall back to work_calendar

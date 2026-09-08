@@ -6,6 +6,7 @@ import { showRoomReservationAlert } from "./RoomReservationAlert";
 import { showSuccessAlert } from "./SuccessAlert";
 import { notifyMeetingPush } from "../utils/pushNotifications";
 import BusinessTripPdfImport from "./BusinessTripPdfImport";
+import CompensatoryLeavePdfImport from "./CompensatoryLeavePdfImport";
 import "./OvertimeConfirmDialog.css";
 
 const KNT_MEETING_ROOM = "KNT meeting room";
@@ -76,6 +77,7 @@ export default function StatusForm({
   const [tripParticipantQuery, setTripParticipantQuery] = useState("");
   const [tripParticipantIds, setTripParticipantIds] = useState([]);
   const [businessTripEntryMethod, setBusinessTripEntryMethod] = useState("manual");
+  const [leaveEntryMethod, setLeaveEntryMethod] = useState("manual");
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [selectedTripDepartment, setSelectedTripDepartment] = useState(null);
   const [unavailable, setUnavailable] = useState(new Map());
@@ -384,6 +386,7 @@ export default function StatusForm({
   const submit = async (event) => {
     event.preventDefault();
     if (status === "business_trip" && businessTripEntryMethod === "pdf") return;
+    if (status === "leave" && leaveEntryMethod === "pdf") return;
     // React disables the button on the next render. This synchronous guard
     // also blocks a second click/Enter event in the same render frame.
     if (submitInFlight.current) return;
@@ -737,13 +740,18 @@ export default function StatusForm({
         <button type="button" className={businessTripEntryMethod === "pdf" ? "is-selected" : ""} aria-pressed={businessTripEntryMethod === "pdf"} onClick={() => setBusinessTripEntryMethod("pdf")}>Import approved PDF</button>
       </div>}
       {status === "business_trip" && businessTripEntryMethod === "pdf" && <BusinessTripPdfImport onSaved={onSaved} />}
-      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && (status === "meeting" ? <>
+      {status === "leave" && <div className="business-trip-entry-method" role="group" aria-label="Annual leave entry method">
+        <button type="button" className={leaveEntryMethod === "manual" ? "is-selected" : ""} aria-pressed={leaveEntryMethod === "manual"} onClick={() => setLeaveEntryMethod("manual")}>Enter manually</button>
+        <button type="button" className={leaveEntryMethod === "pdf" ? "is-selected" : ""} aria-pressed={leaveEntryMethod === "pdf"} onClick={() => setLeaveEntryMethod("pdf")}>Import from approved PDF</button>
+      </div>}
+      {status === "leave" && leaveEntryMethod === "pdf" && <CompensatoryLeavePdfImport employee={employee} onSaved={onSaved} />}
+      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && !(status === "leave" && leaveEntryMethod === "pdf") && (status === "meeting" ? <>
         <label>Date<input required type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); setEndDate(event.target.value); markChanged(); }} /></label>
       </> : <div className="date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
         <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={startDate} onChange={(event) => { setStartDate(event.target.value); if (event.target.value > endDate) setEndDate(event.target.value); markChanged(); }} /></label>
         <label>To date<input type="date" min={startDate} value={endDate} onChange={(event) => { setEndDate(event.target.value); markChanged(); }} /></label>
       </div>)}
-      {status === "leave" && <>
+      {status === "leave" && leaveEntryMethod === "manual" && <>
         {additionalLeaveRanges.map((range, index) => <div className="date-range leave-date-range" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }} key={`${index}-${range.startDate}`}>
           <label>From date<input type="date" min={canEditHistory ? undefined : today()} value={range.startDate} onChange={(event) => updateLeaveRange(index, "startDate", event.target.value)} /></label>
           <label>To date<input type="date" min={range.startDate} value={range.endDate} onChange={(event) => updateLeaveRange(index, "endDate", event.target.value)} /></label>
@@ -1116,7 +1124,7 @@ export default function StatusForm({
           )}
         </>
       ) : (
-        status !== "working" && (
+        status !== "working" && !(status === "leave" && leaveEntryMethod === "pdf") && (
           <label>
             {status === "leave" ? "Location" : "Note"}
             <textarea
@@ -1171,7 +1179,7 @@ export default function StatusForm({
           </section>
         </div>
       )}
-      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && <button className="primary-button" disabled={saving}>
+      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && !(status === "leave" && leaveEntryMethod === "pdf") && <button className="primary-button" disabled={saving}>
         {saving ? "Saving..." : saved ? "Saved" : "Save status"}
       </button>}
     </form>

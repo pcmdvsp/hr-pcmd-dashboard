@@ -4,6 +4,12 @@ import { supabase } from "../lib/supabaseClient";
 import { parseBusinessTripPdf } from "../utils/businessTripPdf";
 import "./BusinessTripPdfImport.css";
 
+const formatPreviewDate = (value) => {
+  if (!value) return "Not detected";
+  const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return match ? `${match[3]}/${match[2]}/${match[1].slice(-2)}` : value;
+};
+
 export default function BusinessTripPdfImport({ onSaved }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
@@ -121,11 +127,11 @@ export default function BusinessTripPdfImport({ onSaved }) {
         {preview && <div className="business-trip-preview">
           <div className="business-trip-preview-heading"><div><p className="eyebrow">SCAN RESULT</p><h3>{preview.documentNumber ? `Document ${preview.documentNumber}` : preview.fileName}</h3></div><span>{preview.pageCount} page{preview.pageCount === 1 ? "" : "s"}</span></div>
           {preview.warnings.length > 0 && <div className="business-trip-warnings"><strong>Please verify:</strong><ul>{preview.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></div>}
-          <dl className="business-trip-summary"><div><dt>Departure date</dt><dd>{preview.departureDate || "Not detected"}</dd></div><div><dt>Return date</dt><dd>{preview.returnDate || "Not detected"}</dd></div><div><dt>Location</dt><dd>{preview.location || "Not detected"}</dd></div><div><dt>Content</dt><dd>{preview.content || "Not detected"}</dd></div></dl>
+          <dl className="business-trip-summary"><div><dt>Departure date</dt><dd>{formatPreviewDate(preview.departureDate)}</dd></div><div><dt>Return date</dt><dd>{formatPreviewDate(preview.returnDate)}</dd></div><div><dt>Location</dt><dd>{preview.location || "Not detected"}</dd></div><div><dt>Content</dt><dd>{preview.content || "Not detected"}</dd></div></dl>
           <div className="business-trip-participant-heading"><h4>PCMD participants ({preview.participants.length})</h4>{preview.excludedParticipants.length > 0 && <span>{preview.excludedParticipants.length} outside PCMD excluded</span>}</div>
           <div className="business-trip-preview-table-wrap"><table className="business-trip-preview-table"><thead><tr><th>Employee ID</th><th>Full name</th><th>Department</th><th>Role</th><th>Note</th></tr></thead><tbody>{preview.participants.map((person) => <tr key={person.employeeCode}><td>{person.employeeCode}</td><td>{person.fullName}</td><td>{person.departmentName}</td><td>{person.isLeader ? "Trip leader" : "Member"}</td><td>{person.note || ""}</td></tr>)}{preview.participants.length === 0 && <tr><td colSpan="5" className="empty">No active PCMD profiles matched the PDF</td></tr>}</tbody></table></div>
           <p className="business-trip-preview-note">Employees marked Back-up remain in the preview but are not imported as Business trip.</p>
-          {syncResult && <div className="business-trip-import-success"><strong>{syncResult.alreadyImported ? "This PDF was already imported." : "Business trip imported successfully."}</strong><span>{syncResult.employeeCount || 0} employee{syncResult.employeeCount === 1 ? "" : "s"}, {syncResult.statusRowCount || 0} daily status row{syncResult.statusRowCount === 1 ? "" : "s"}.</span></div>}
+          {syncResult && <div className={`business-trip-import-success ${syncResult.alreadyImported ? "is-duplicate" : ""}`}><strong>{syncResult.alreadyImported ? "This PDF was already imported." : "Business trip imported successfully."}</strong><span>{syncResult.employeeCount || 0} employee{syncResult.employeeCount === 1 ? "" : "s"}, {syncResult.statusRowCount || 0} daily status row{syncResult.statusRowCount === 1 ? "" : "s"}.</span></div>}
           <div className="business-trip-confirm-actions"><button type="button" className="primary-button" disabled={syncing || Boolean(syncResult)} onClick={confirmImport}>{syncing ? "Importing..." : syncResult ? "Imported" : "Confirm and import"}</button></div>
         </div>}
       </section>

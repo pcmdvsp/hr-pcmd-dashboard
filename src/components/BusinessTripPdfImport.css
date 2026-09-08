@@ -28,6 +28,7 @@
 .business-trip-preview-note { margin: 14px 0 0; color: #6b7f91; font-size: 12px; }
 .business-trip-confirm-actions { display: flex; justify-content: flex-end; margin-top: 16px; }
 .business-trip-import-success { display: grid; gap: 3px; margin-top: 14px; padding: 12px 14px; border: 1px solid #b8dec8; border-radius: 10px; background: #edf9f2; color: #24613d; }
+.business-trip-import-success.is-duplicate strong { color: #c62828; }
 .business-trip-import-success span { font-size: 13px; }
 .business-trip-participant-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0 8px; }
 .business-trip-participant-heading h4 { margin: 0; }

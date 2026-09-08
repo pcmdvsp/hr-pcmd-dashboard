@@ -235,6 +235,18 @@ stored in `vsp_business_trip_imports` so confirming the same PDF again is
 idempotent. Apply the latest `supabase_status_notifications.sql` before using the
 Confirm button.
 
+### Approved compensatory-leave PDF import
+
+My Status Annual leave supports manual entry and an approved-PDF import for
+compensatory leave. The preview extracts the employee name and ID, all leave
+date ranges, location, and total hours. Both the frontend and the database RPC
+require the PDF employee ID to match the signed-in user's active profile.
+Confirmed files may write historical dates, overwrite the user's status for the
+approved ranges, remove conflicting meeting attendance, and create shared leave
+notifications marked `Synced from approved VSP PDF`. File hashes are stored in
+`vsp_compensatory_leave_imports` to prevent duplicate imports. Apply the latest
+`supabase_status_notifications.sql` before using the Confirm button.
+
 ## Build production
 
 ### Browser push notification pilot
