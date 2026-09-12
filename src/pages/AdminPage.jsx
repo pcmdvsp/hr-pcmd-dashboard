@@ -35,7 +35,7 @@ export default function AdminPage({ data, profile, goBack }) {
     setMeetingSyncLogsBusy(true); setMeetingSyncLogsError('')
     const { data: logs, error } = await supabase
       .from('vsp_meeting_sync_logs')
-      .select('id,mode,target_date,status,upstream_meeting_count,matched_meeting_count,created_count,unchanged_count,failed_count,skipped_attendees,errors,started_at,finished_at,duration_ms')
+      .select('id,mode,target_date,status,upstream_meeting_count,matched_meeting_count,generated_occurrence_count,created_count,unchanged_count,failed_count,skipped_attendees,errors,started_at,finished_at,duration_ms')
       .order('started_at', { ascending: false })
       .limit(20)
     if (error) setMeetingSyncLogsError(error.message)
@@ -120,7 +120,8 @@ export default function AdminPage({ data, profile, goBack }) {
         const created = result?.sync?.createdCount ?? 0
         const unchanged = result?.sync?.unchangedCount ?? 0
         const failed = result?.sync?.failedCount ?? 0
-        showSuccessAlert(`VSP meetings synced: ${created} created, ${unchanged} unchanged${failed ? `, ${failed} failed` : ''}.`)
+        const occurrences = result?.sync?.generatedOccurrenceCount ?? created + unchanged + failed
+        showSuccessAlert(`VSP meetings synced: ${occurrences} daily occurrence(s), ${created} created, ${unchanged} unchanged${failed ? `, ${failed} failed` : ''}.`)
       }
     }
     setMeetingBusy(false)
@@ -202,10 +203,10 @@ export default function AdminPage({ data, profile, goBack }) {
         {meetingSyncLogsError && <p className="form-error">{meetingSyncLogsError}</p>}
         {!meetingSyncLogsBusy && !meetingSyncLogsError && meetingSyncLogs.length === 0 && <p className="empty">No automatic meeting scans have been logged yet.</p>}
         {meetingSyncLogs.length > 0 && <div className="meeting-sync-log-table-wrap"><table className="meeting-sync-log-table">
-          <thead><tr><th>Started</th><th>Target date</th><th>Status</th><th>VSP</th><th>Matched</th><th>Created</th><th>Unchanged</th><th>Failed</th><th>Details</th></tr></thead>
+          <thead><tr><th>Started</th><th>Target date</th><th>Status</th><th>VSP</th><th>Matched</th><th>Occurrences</th><th>Created</th><th>Unchanged</th><th>Failed</th><th>Details</th></tr></thead>
           <tbody>{meetingSyncLogs.map(log => <tr key={log.id}>
             <td>{new Date(log.started_at).toLocaleString('en-GB')}</td><td>{log.target_date}</td><td><span className={`sync-log-status is-${log.status}`}>{log.status}</span><small>{log.mode} · {log.duration_ms} ms</small></td>
-            <td>{log.upstream_meeting_count}</td><td>{log.matched_meeting_count}</td><td>{log.created_count}</td><td>{log.unchanged_count}</td><td>{log.failed_count}</td>
+            <td>{log.upstream_meeting_count}</td><td>{log.matched_meeting_count}</td><td>{log.generated_occurrence_count}</td><td>{log.created_count}</td><td>{log.unchanged_count}</td><td>{log.failed_count}</td>
             <td>{(log.errors?.length || log.skipped_attendees?.length) ? <details><summary>JSON</summary><pre className="vsp-test-result">{JSON.stringify({ errors: log.errors, skippedAttendees: log.skipped_attendees }, null, 2)}</pre></details> : '—'}</td>
           </tr>)}</tbody>
         </table></div>}

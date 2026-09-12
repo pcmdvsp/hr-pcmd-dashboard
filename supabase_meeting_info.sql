@@ -82,9 +82,20 @@ alter table public.employee_meetings add column if not exists recurrence_rule te
 alter table public.employee_meetings add column if not exists recurrence_until date;
 alter table public.employee_meetings add column if not exists external_source text;
 alter table public.employee_meetings add column if not exists external_id text;
-create unique index if not exists employee_meetings_external_source_id_key
-  on public.employee_meetings(external_source, external_id)
-  where external_source is not null and external_id is not null;
+alter table public.employee_meetings add column if not exists external_occurrence_date date;
+-- Existing eOffice rows represented one day, so their stored date is the
+-- occurrence date when upgrading to multi-day booking support.
+update public.employee_meetings
+set external_occurrence_date = date
+where external_source is not null
+  and external_id is not null
+  and external_occurrence_date is null;
+drop index if exists public.employee_meetings_external_source_id_key;
+create unique index if not exists employee_meetings_external_source_id_date_key
+  on public.employee_meetings(external_source, external_id, external_occurrence_date)
+  where external_source is not null
+    and external_id is not null
+    and external_occurrence_date is not null;
 create index if not exists employee_meetings_recurrence_idx on public.employee_meetings(recurrence_id, date)
   where recurrence_id is not null;
 
@@ -209,9 +220,11 @@ create policy "participants leave employee meetings" on public.employee_meeting_
 -- Atomically inserts or updates one meeting imported from an external system,
 -- then makes its attendee rows exactly match the supplied dashboard profiles.
 -- The caller remains subject to the table RLS policies and must be an admin.
+drop function if exists public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]);
 create or replace function public.sync_external_employee_meeting(
   p_external_source text,
   p_external_id text,
+  p_external_occurrence_date date,
   p_organizer_id uuid,
   p_date date,
   p_content text,
@@ -230,8 +243,12 @@ begin
   if auth.role() <> 'service_role' and not public.is_admin() then
     raise exception 'Only an administrator or the scheduler can sync external meetings';
   end if;
-  if nullif(trim(p_external_source), '') is null or nullif(trim(p_external_id), '') is null then
-    raise exception 'External source and ID are required';
+  if nullif(trim(p_external_source), '') is null or nullif(trim(p_external_id), '') is null
+      or p_external_occurrence_date is null then
+    raise exception 'External source, ID and occurrence date are required';
+  end if;
+  if p_external_occurrence_date is distinct from p_date then
+    raise exception 'External occurrence date must match the stored meeting date';
   end if;
   if coalesce(array_length(p_attendee_ids, 1), 0) = 0 then
     raise exception 'At least one attendee is required';
@@ -239,7 +256,9 @@ begin
 
   select m.id into v_meeting_id
   from public.employee_meetings m
-  where m.external_source = p_external_source and m.external_id = p_external_id;
+  where m.external_source = p_external_source
+    and m.external_id = p_external_id
+    and m.external_occurrence_date = p_external_occurrence_date;
   if v_meeting_id is not null then
     meeting_id := v_meeting_id;
     was_created := false;
@@ -249,13 +268,15 @@ begin
 
   insert into public.employee_meetings(
     organizer_id, date, content, location, start_time, end_time,
-    external_source, external_id
+    external_source, external_id, external_occurrence_date
   ) values (
     p_organizer_id, p_date, p_content, p_location, p_start_time, p_end_time,
-    p_external_source, p_external_id
+    p_external_source, p_external_id, p_external_occurrence_date
   )
-  on conflict (external_source, external_id)
-    where external_source is not null and external_id is not null
+  on conflict (external_source, external_id, external_occurrence_date)
+    where external_source is not null
+      and external_id is not null
+      and external_occurrence_date is not null
   do nothing
   returning id into v_meeting_id;
 
@@ -264,7 +285,9 @@ begin
   if v_meeting_id is null then
     select m.id into v_meeting_id
     from public.employee_meetings m
-    where m.external_source = p_external_source and m.external_id = p_external_id;
+    where m.external_source = p_external_source
+      and m.external_id = p_external_id
+      and m.external_occurrence_date = p_external_occurrence_date;
     meeting_id := v_meeting_id;
     was_created := false;
     return next;
@@ -282,9 +305,9 @@ begin
 end;
 $$;
 
-revoke all on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) from public;
-grant execute on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) to authenticated;
-grant execute on function public.sync_external_employee_meeting(text, text, uuid, date, text, text, time, time, uuid[]) to service_role;
+revoke all on function public.sync_external_employee_meeting(text, text, date, uuid, date, text, text, time, time, uuid[]) from public;
+grant execute on function public.sync_external_employee_meeting(text, text, date, uuid, date, text, text, time, time, uuid[]) to authenticated;
+grant execute on function public.sync_external_employee_meeting(text, text, date, uuid, date, text, text, time, time, uuid[]) to service_role;
 
 -- Operational history for automatic eOffice meeting scans. This intentionally
 -- stores counts and safe error summaries only, never credentials or session data.
@@ -296,6 +319,7 @@ create table if not exists public.vsp_meeting_sync_logs (
   status text not null check (status in ('success', 'no_matches', 'partial', 'failed')),
   upstream_meeting_count integer not null default 0 check (upstream_meeting_count >= 0),
   matched_meeting_count integer not null default 0 check (matched_meeting_count >= 0),
+  generated_occurrence_count integer not null default 0 check (generated_occurrence_count >= 0),
   created_count integer not null default 0 check (created_count >= 0),
   unchanged_count integer not null default 0 check (unchanged_count >= 0),
   failed_count integer not null default 0 check (failed_count >= 0),
@@ -306,6 +330,9 @@ create table if not exists public.vsp_meeting_sync_logs (
   duration_ms integer not null check (duration_ms >= 0),
   created_at timestamptz not null default now()
 );
+alter table public.vsp_meeting_sync_logs
+  add column if not exists generated_occurrence_count integer not null default 0
+  check (generated_occurrence_count >= 0);
 create index if not exists vsp_meeting_sync_logs_started_idx
   on public.vsp_meeting_sync_logs(started_at desc);
 alter table public.vsp_meeting_sync_logs

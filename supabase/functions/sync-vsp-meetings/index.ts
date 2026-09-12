@@ -115,6 +115,7 @@ Deno.serve(async (request) => {
     const logSaved = await writeLog({
       status: logStatus,
       upstream_meeting_count: meetings.length, matched_meeting_count: filtered.length,
+      generated_occurrence_count: sync.generatedOccurrenceCount,
       created_count: createdCount, unchanged_count: unchangedCount, failed_count: failedCount,
       skipped_attendees: sync.skippedAttendees, errors: sync.errors,
     });
@@ -122,6 +123,7 @@ Deno.serve(async (request) => {
       mode, targetDate, status: logStatus, logSaved,
       upstreamMeetingCount: meetings.length, matchedMeetingCount: filtered.length,
       sync: {
+        generatedOccurrenceCount: sync.generatedOccurrenceCount,
         createdCount, unchangedCount, failedCount,
         skippedAttendees: sync.skippedAttendees, records: sync.records, errors: sync.errors,
       },

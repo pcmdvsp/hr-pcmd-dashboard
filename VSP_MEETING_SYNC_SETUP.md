@@ -39,5 +39,9 @@ For example, a Thursday meeting is scanned on Monday (`in3days`), Tuesday
 (`in2days`), Wednesday (`tomorrow`), then Thursday at 08:00 and 11:45 (`today`).
 
 Existing eOffice `recID` records are not replaced, so attendees manually added
-in the dashboard remain unchanged. Each authorized run writes a safe summary to
-`vsp_meeting_sync_logs`; credentials and secrets are never logged.
+in the dashboard remain unchanged. A booking whose eOffice start and end dates
+span multiple Vietnam calendar days is expanded into one dashboard meeting per
+day. Every occurrence repeats the source start/end clock times and is identified
+by `recID` plus its occurrence date, so later scans do not create duplicates.
+Each authorized run writes both matched-booking and generated-occurrence counts
+to `vsp_meeting_sync_logs`; credentials and secrets are never logged.

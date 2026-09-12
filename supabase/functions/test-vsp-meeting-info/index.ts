@@ -271,6 +271,7 @@ Deno.serve(async (request) => {
       upstreamMeetingCount: meetings.length,
       recordCount: filtered.length,
       sync: {
+        generatedOccurrenceCount: sync.generatedOccurrenceCount,
         createdCount: sync.records.filter((item: { action: string }) => item.action === "created").length,
         updatedCount: sync.records.filter((item: { action: string }) => item.action === "updated").length,
         unchangedCount: sync.records.filter((item: { action: string }) => item.action === "unchanged").length,

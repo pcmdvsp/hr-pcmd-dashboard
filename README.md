@@ -144,7 +144,9 @@ the same Admin action now synchronizes them into `employee_meetings` and
 `employee_meeting_attendees`. Apply the latest `supabase_meeting_info.sql` first:
 it adds the nullable `external_source`/`external_id` identity columns, a partial
 unique index, and the authenticated Admin-only `sync_external_employee_meeting`
-RPC. The eOffice `recID` is the idempotency key. Once that external meeting exists,
+RPC. A booking spanning multiple Vietnam calendar days becomes one meeting row
+per day, with the source start/end clock times repeated on every day. The eOffice
+`recID` plus occurrence date is the idempotency key. Once an occurrence exists,
 later scans report it as `unchanged` and do not update its fields, organizer, or
 attendee rows. This preserves participants added manually from the frontend. The
 attendee marked by eOffice with `roleType = "2"` is matched to a dashboard
