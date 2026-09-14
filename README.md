@@ -209,8 +209,10 @@ supabase functions deploy sync-vsp-leave
 ```
 
 Automatic VSP meeting synchronization is implemented by the separate
-`sync-vsp-meetings` Edge Function. It scans tomorrow at 18:00 Vietnam time and
-today at 11:00 Vietnam time while preserving the Admin test button. Deployment,
+`sync-vsp-meetings` Edge Function. At 15:00 Vietnam time, one scheduled
+invocation logs in to eOffice once and scans tomorrow, two days ahead, and three
+days ahead sequentially with the same in-memory session. It also scans today at
+08:00 and 11:45. Scheduled HTTP calls use a 60-second timeout. Deployment,
 Vault, and `pg_cron` setup are documented in `VSP_MEETING_SYNC_SETUP.md`.
 
 Scheduled VSP leave synchronization stores the latest operational history in

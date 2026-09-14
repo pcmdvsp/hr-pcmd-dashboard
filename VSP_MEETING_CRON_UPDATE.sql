@@ -8,31 +8,17 @@ where jobname in (
   'vsp-meetings-tomorrow-at-15-vn',
   'vsp-meetings-in2days-at-15-vn',
   'vsp-meetings-in3days-at-15-vn',
+  'vsp-meetings-next-3-days-at-15-vn',
   'vsp-meetings-today-at-08-vn',
   'vsp-meetings-today-at-1145-vn'
 );
 
-select cron.schedule('vsp-meetings-tomorrow-at-15-vn', '0 8 * * *', $$
+select cron.schedule('vsp-meetings-next-3-days-at-15-vn', '0 8 * * *', $$
   select net.http_post(
     url := 'https://kqifgovkyjkzgzbvuecc.supabase.co/functions/v1/sync-vsp-meetings',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='vsp_meeting_sync_cron_secret')),
-    body := '{"mode":"tomorrow"}'::jsonb
-  );
-$$);
-
-select cron.schedule('vsp-meetings-in2days-at-15-vn', '0 8 * * *', $$
-  select net.http_post(
-    url := 'https://kqifgovkyjkzgzbvuecc.supabase.co/functions/v1/sync-vsp-meetings',
-    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='vsp_meeting_sync_cron_secret')),
-    body := '{"mode":"in2days"}'::jsonb
-  );
-$$);
-
-select cron.schedule('vsp-meetings-in3days-at-15-vn', '0 8 * * *', $$
-  select net.http_post(
-    url := 'https://kqifgovkyjkzgzbvuecc.supabase.co/functions/v1/sync-vsp-meetings',
-    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='vsp_meeting_sync_cron_secret')),
-    body := '{"mode":"in3days"}'::jsonb
+    body := '{"modes":["tomorrow","in2days","in3days"]}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 
@@ -40,7 +26,8 @@ select cron.schedule('vsp-meetings-today-at-08-vn', '0 1 * * *', $$
   select net.http_post(
     url := 'https://kqifgovkyjkzgzbvuecc.supabase.co/functions/v1/sync-vsp-meetings',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='vsp_meeting_sync_cron_secret')),
-    body := '{"mode":"today"}'::jsonb
+    body := '{"mode":"today"}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 
@@ -48,6 +35,7 @@ select cron.schedule('vsp-meetings-today-at-1145-vn', '45 4 * * *', $$
   select net.http_post(
     url := 'https://kqifgovkyjkzgzbvuecc.supabase.co/functions/v1/sync-vsp-meetings',
     headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='vsp_meeting_sync_cron_secret')),
-    body := '{"mode":"today"}'::jsonb
+    body := '{"mode":"today"}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);

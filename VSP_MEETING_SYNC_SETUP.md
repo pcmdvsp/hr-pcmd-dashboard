@@ -31,7 +31,9 @@ select vault.create_secret(
 Run [VSP_MEETING_CRON_UPDATE.sql](VSP_MEETING_CRON_UPDATE.sql) in the Supabase
 SQL Editor. It removes the previous meeting jobs and creates these jobs:
 
-- Every day at 15:00 Vietnam time: scan tomorrow, two days ahead, and three days ahead.
+- Every day at 15:00 Vietnam time: one scheduler call logs in once, then scans
+  tomorrow, two days ahead, and three days ahead sequentially with the same
+  in-memory eOffice session.
 - Every day at 08:00 Vietnam time: scan today.
 - Every day at 11:45 Vietnam time: scan today again.
 
@@ -45,3 +47,6 @@ day. Every occurrence repeats the source start/end clock times and is identified
 by `recID` plus its occurrence date, so later scans do not create duplicates.
 Each authorized run writes both matched-booking and generated-occurrence counts
 to `vsp_meeting_sync_logs`; credentials and secrets are never logged.
+All scheduler HTTP calls use a 60-second `pg_net` timeout. Rerun
+`VSP_MEETING_CRON_UPDATE.sql` after upgrading so the old three concurrent 15:00
+jobs are removed and replaced by the single batch job.
