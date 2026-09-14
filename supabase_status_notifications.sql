@@ -43,6 +43,70 @@ alter table public.status_update_notifications add constraint status_update_noti
   check (action in ('updated', 'removed'));
 create index if not exists status_update_notifications_created_idx
   on public.status_update_notifications(created_at desc);
+create index if not exists status_update_notifications_recent_duplicate_idx
+  on public.status_update_notifications(employee_id, status, start_date, end_date, action, created_at desc);
+
+-- Keep the newest copy of identical notifications accidentally submitted within
+-- two minutes. This repairs existing duplicate clicks without collapsing a real
+-- status update repeated later in the employee's history.
+with duplicate_notifications as (
+  select id, created_at,
+    lead(created_at) over (
+      partition by employee_id, status, start_date, end_date, content, location,
+        participant_ids, action
+      order by created_at, id
+    ) as next_created_at
+  from public.status_update_notifications
+)
+delete from public.status_update_notifications notification
+using duplicate_notifications duplicate
+where notification.id = duplicate.id
+  and duplicate.next_created_at <= duplicate.created_at + interval '2 minutes';
+
+-- Browser retries, multiple tabs, and repeated RPC calls can reach the database
+-- even when the Save button is guarded. Serialize matching inserts and silently
+-- discard an identical notification created in the preceding two minutes.
+create or replace function public.prevent_recent_duplicate_status_notification()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  perform pg_advisory_xact_lock(hashtextextended(concat_ws('|',
+    new.employee_id::text,
+    new.status,
+    new.start_date::text,
+    new.end_date::text,
+    coalesce(new.content, ''),
+    coalesce(new.location, ''),
+    coalesce(new.action, 'updated')
+  ), 0));
+
+  if exists (
+    select 1
+    from public.status_update_notifications existing
+    where existing.employee_id = new.employee_id
+      and existing.status = new.status
+      and existing.start_date = new.start_date
+      and existing.end_date = new.end_date
+      and existing.content is not distinct from new.content
+      and existing.location is not distinct from new.location
+      and existing.action = new.action
+      and coalesce(existing.participant_ids, '{}'::uuid[]) @> coalesce(new.participant_ids, '{}'::uuid[])
+      and coalesce(new.participant_ids, '{}'::uuid[]) @> coalesce(existing.participant_ids, '{}'::uuid[])
+      and existing.created_at >= new.created_at - interval '2 minutes'
+  ) then
+    return null;
+  end if;
+
+  return new;
+end;
+$$;
+drop trigger if exists prevent_recent_duplicate_status_notification_insert
+  on public.status_update_notifications;
+create trigger prevent_recent_duplicate_status_notification_insert
+before insert on public.status_update_notifications
+for each row execute function public.prevent_recent_duplicate_status_notification();
 
 create table if not exists public.status_update_notification_reads (
   notification_id uuid not null references public.status_update_notifications(id) on delete cascade,

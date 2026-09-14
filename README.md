@@ -12,6 +12,7 @@
 - Meeting Info: tạo, sửa, hủy cuộc họp; người tham gia, nội dung, địa điểm, Online Link, kiểm tra trùng KNT meeting room và thêm nhanh thành viên theo phòng ban.
 - Meeting notification: chuông thông báo cá nhân cho meeting mới, meeting được cập nhật và meeting bị hủy.
 - Status notification: thông báo toàn hệ thống khi nhân sự cập nhật Business trip, Annual leave hoặc Sick leave.
+- Manual status notifications ignore identical submissions repeated within two minutes; the Save button is re-enabled only after the form changes.
 - Xuất file `.ics` để người tham gia thêm meeting vào Outlook Calendar với reminder 10 phút.
 - Phân quyền admin/normal user bằng Supabase RLS.
 

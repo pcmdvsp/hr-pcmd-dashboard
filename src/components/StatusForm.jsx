@@ -389,7 +389,7 @@ export default function StatusForm({
     if (status === "leave" && leaveEntryMethod === "pdf") return;
     // React disables the button on the next render. This synchronous guard
     // also blocks a second click/Enter event in the same render frame.
-    if (submitInFlight.current) return;
+    if (submitInFlight.current || saved) return;
     setSaving(true);
     if (status === "meeting" && repeat === "weekly" && (!repeatUntil || repeatUntil < startDate)) {
       setSaving(false);
@@ -1179,7 +1179,7 @@ export default function StatusForm({
           </section>
         </div>
       )}
-      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && !(status === "leave" && leaveEntryMethod === "pdf") && <button className="primary-button" disabled={saving}>
+      {!(status === "business_trip" && businessTripEntryMethod === "pdf") && !(status === "leave" && leaveEntryMethod === "pdf") && <button className="primary-button" disabled={saving || saved}>
         {saving ? "Saving..." : saved ? "Saved" : "Save status"}
       </button>}
     </form>
