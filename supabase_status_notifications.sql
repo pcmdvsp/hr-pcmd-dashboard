@@ -312,7 +312,7 @@ begin
 
   select array_agg(employee_code order by employee_code) into normalized_codes
   from (
-    select distinct trim(code) as employee_code
+    select distinct upper(trim(code)) as employee_code
     from unnest(coalesce(p_employee_codes, '{}'::text[])) as supplied(code)
     where trim(code) <> ''
   ) normalized;
@@ -320,7 +320,7 @@ begin
   select array_agg(profile.id order by profile.employee_code) into target_ids
   from public.profiles profile
   where profile.active = true
-    and profile.employee_code = any(coalesce(normalized_codes, '{}'::text[]));
+    and upper(trim(profile.employee_code)) = any(coalesce(normalized_codes, '{}'::text[]));
   if coalesce(cardinality(target_ids), 0) = 0 then
     raise exception 'No active PCMD employee profiles matched the PDF';
   end if;

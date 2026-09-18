@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { FileText, Upload } from "lucide-react";
 import { supabase } from "../lib/supabaseClient";
 import { parseBusinessTripPdf } from "../utils/businessTripPdf";
+import { normalizeEmployeeCode } from "../utils/employeeCode";
 import "./BusinessTripPdfImport.css";
 
 const formatPreviewDate = (value) => {
@@ -35,30 +36,32 @@ export default function BusinessTripPdfImport({ onSaved }) {
     setSyncResult(null);
     try {
       const parsed = await parseBusinessTripPdf(file);
-      const employeeCodes = [...new Set(parsed.participants.map((person) => person.employeeCode))];
+      const employeeCodes = [...new Set(parsed.participants.map((person) => normalizeEmployeeCode(person.employeeCode)))];
       const { data: profiles, error: profileError } = employeeCodes.length
         ? await supabase
             .from("profiles")
             .select("id,employee_code,full_name,department_id,departments(name)")
             .eq("active", true)
-            .in("employee_code", employeeCodes)
+            .limit(5000)
         : { data: [], error: null };
       if (profileError) throw new Error(`Unable to verify PCMD employees: ${profileError.message}`);
 
-      const profileByCode = new Map((profiles || []).map((profile) => [String(profile.employee_code).trim(), profile]));
+      const profileByCode = new Map((profiles || []).map((profile) => [normalizeEmployeeCode(profile.employee_code), profile]));
       const participants = parsed.participants
-        .filter((person) => profileByCode.has(person.employeeCode))
+        .filter((person) => profileByCode.has(normalizeEmployeeCode(person.employeeCode)))
         .map((person) => {
-          const profile = profileByCode.get(person.employeeCode);
+          const employeeCode = normalizeEmployeeCode(person.employeeCode);
+          const profile = profileByCode.get(employeeCode);
           const department = Array.isArray(profile.departments) ? profile.departments[0] : profile.departments;
           return {
             ...person,
+            employeeCode,
             profileId: profile.id,
             fullName: profile.full_name || person.fullName,
             departmentName: department?.name || "Management Board",
           };
         });
-      const excludedParticipants = parsed.participants.filter((person) => !profileByCode.has(person.employeeCode));
+      const excludedParticipants = parsed.participants.filter((person) => !profileByCode.has(normalizeEmployeeCode(person.employeeCode)));
       setPreview({ ...parsed, participants, excludedParticipants, scannedParticipantCount: parsed.participants.length });
     } catch (scanError) {
       setError(scanError instanceof Error ? scanError.message : "Unable to read this PDF.");

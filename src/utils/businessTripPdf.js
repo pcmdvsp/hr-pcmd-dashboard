@@ -1,3 +1,5 @@
+import { findEmployeeCode, findEmployeeCodeCell, normalizeEmployeeCode } from "./employeeCode";
+
 const normalize = (value = "") => value.replace(/\s+/g, " ").trim();
 
 const joinCells = (cells) => normalize(cells.reduce((value, cell, index) => {
@@ -35,11 +37,11 @@ const findDateNear = (text, labels) => {
 const parseParticipants = (lines) => {
   const found = new Map();
   lines.forEach((line, index) => {
-    const codeMatch = line.match(/(?:^|\s)(\d{5})(?:\s|$)/);
-    if (!codeMatch) return;
-    const employeeCode = codeMatch[1];
+    const employeeCode = findEmployeeCode(line);
+    if (!employeeCode) return;
     const around = normalize([lines[index - 1], line, lines[index + 1]].filter(Boolean).join(" "));
-    const afterCode = normalize(around.split(employeeCode).slice(1).join(employeeCode));
+    const codeIndex = around.toUpperCase().indexOf(employeeCode);
+    const afterCode = normalize(codeIndex >= 0 ? around.slice(codeIndex + employeeCode.length) : around);
     const nameMatch = afterCode.match(/([A-ZÀ-ỸĐ][\p{L}Đđ]*(?:\s+[A-ZÀ-ỸĐ][\p{L}Đđ]*){1,6})/u);
     const fallback = normalize(line.replace(/^\s*\d+[.)]?\s*/, "").replace(employeeCode, " "));
     const name = normalize(nameMatch?.[1] || fallback.split(/\s{2,}|\d{1,2}[\/.\-]\d{1,2}[\/.\-]\d{4}/)[0]);
@@ -119,8 +121,8 @@ const parseIndividualOrder = (rows) => {
   const employeeCode = recipientRow.cells
     .filter((cell) => cell.x >= 355)
     .map((cell) => cell.text)
-    .join("")
-    .match(/\d{5}/)?.[0] || null;
+    .join("");
+  const normalizedEmployeeCode = findEmployeeCode(employeeCode);
   const destination = sectionValue(rows, "Được cử", "Thời gian công tác", 220)
     ?.replace(/^đi\s*đến\s*/iu, "") || null;
   const duration = sectionValue(rows, "Thời gian công tác", "Nhiệm vụ được giao", 265);
@@ -133,8 +135,8 @@ const parseIndividualOrder = (rows) => {
     location: destination,
     departureDate: dates ? toIsoDate(dates[1]) : null,
     returnDate: dates ? toIsoDate(dates[2]) : null,
-    participants: employeeCode && recipientText
-      ? [{ employeeCode, fullName: recipientText, isLeader: false, note: "" }]
+    participants: normalizedEmployeeCode && recipientText
+      ? [{ employeeCode: normalizedEmployeeCode, fullName: recipientText, isLeader: false, note: "" }]
       : [],
   };
 };
@@ -150,10 +152,10 @@ const parseTableParticipants = (rows) => {
   const tableRows = rows.slice(headerIndex + 1, endIndex > headerIndex ? endIndex : undefined);
   const employees = [];
   tableRows.forEach((row, index) => {
-    const codeCell = row.cells.find((cell) => cell.x >= 175 && cell.x < 225 && /^\d{5}$/.test(cell.text.trim()));
+    const codeCell = findEmployeeCodeCell(row.cells, 175, 225);
     if (!codeCell) return;
     const nextEmployeeOffset = tableRows.slice(index + 1).findIndex((candidate) =>
-      candidate.cells.some((cell) => cell.x >= 175 && cell.x < 225 && /^\d{5}$/.test(cell.text.trim())),
+      Boolean(findEmployeeCodeCell(candidate.cells, 175, 225)),
     );
     const employeeRows = tableRows.slice(index, nextEmployeeOffset < 0 ? tableRows.length : index + 1 + nextEmployeeOffset);
     const fullName = normalize(employeeRows.flatMap((candidate) =>
@@ -165,7 +167,7 @@ const parseTableParticipants = (rows) => {
     const note = employeeRows.some((candidate) => compact(candidate.text).includes("dựphòng"))
       ? "Back-up"
       : "";
-    if (fullName) employees.push({ employeeCode: codeCell.text.trim(), fullName, isLeader, note });
+    if (fullName) employees.push({ employeeCode: codeCell.employeeCode, fullName, isLeader, note });
   });
   return employees;
 };
@@ -173,7 +175,7 @@ const parseTableParticipants = (rows) => {
 const parseCoordinateParticipants = (rows) => {
   const found = new Map();
   rows.forEach((row) => {
-    const codeCell = row.cells.find((cell) => cell.x >= 175 && cell.x < 250 && /^\d{5}$/.test(cell.text.trim()));
+    const codeCell = findEmployeeCodeCell(row.cells, 175, 250);
     if (!codeCell) return;
     const fullName = normalize(row.cells
       .filter((cell) => cell.x >= 80 && cell.x < codeCell.x)
@@ -181,8 +183,8 @@ const parseCoordinateParticipants = (rows) => {
       .join(" ")
       .replace(/^\s*\d+[.)]?\s*/, ""));
     if (fullName && /\p{L}/u.test(fullName)) {
-      found.set(codeCell.text.trim(), {
-        employeeCode: codeCell.text.trim(),
+      found.set(codeCell.employeeCode, {
+        employeeCode: codeCell.employeeCode,
         fullName,
         isLeader: row.cells.some((cell) => cell.x > codeCell.x && compact(cell.text).includes("trưởngđoàn")),
         note: compact(row.text).includes("dựphòng") ? "Back-up" : "",
@@ -195,14 +197,17 @@ const parseCoordinateParticipants = (rows) => {
 const parseBackupEmployeeCodes = (text) => {
   const codes = new Set();
   const normalizedText = normalize(text);
-  const pattern = /dự\s*phòng[\s\S]{0,160}?(?:ds|danh\s*số)\s*:?\s*(\d{5})/giu;
-  for (const match of normalizedText.matchAll(pattern)) codes.add(match[1]);
+  const pattern = /dự\s*phòng[\s\S]{0,160}?(?:ds|danh\s*số)\s*:?\s*([a-z0-9]{5,10})(?=\s|$|[.,;:)])/giu;
+  for (const match of normalizedText.matchAll(pattern)) {
+    const employeeCode = findEmployeeCode(match[1]);
+    if (employeeCode) codes.add(employeeCode);
+  }
 
   // Some PDFs split every accented label character into a separate text item.
   // The compact pass keeps the relationship between "Dự phòng" and "DS" intact.
   const compactText = compact(normalizedText);
   const compactPattern = /dựphòng.{0,120}?(?:ds|danhsố)(\d{5})/gu;
-  for (const match of compactText.matchAll(compactPattern)) codes.add(match[1]);
+  for (const match of compactText.matchAll(compactPattern)) codes.add(normalizeEmployeeCode(match[1]));
   return codes;
 };
 
