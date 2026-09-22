@@ -114,6 +114,36 @@
   padding: 9px 15px;
 }
 
+.birthday-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+  margin: -12px 0 18px;
+  padding: 10px 14px;
+  border: 1px solid #e8b850;
+  border-radius: 11px;
+  background: linear-gradient(90deg, #fff2be, #fff9e4, #fff2be);
+  color: #7c4b00;
+  box-shadow: 0 5px 14px rgba(134, 91, 11, .1);
+}
+.birthday-banner-icon { display: inline-flex; flex: 0 0 auto; }
+.birthday-banner-window { min-width: 0; overflow: hidden; flex: 1; }
+.birthday-banner p {
+  width: max-content;
+  margin: 0;
+  padding-left: 100%;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 700;
+  animation: birthday-banner-scroll 18s linear infinite;
+}
+.birthday-banner:hover p { animation-play-state: paused; }
+@keyframes birthday-banner-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .birthday-banner p { width: auto; padding-left: 0; white-space: normal; animation: none; }
+}
+
 .production-dashboard-tab {
   margin-left: auto;
   padding: 9px 15px;

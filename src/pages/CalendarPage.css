@@ -1,0 +1,81 @@
+.employee-calendar-page { max-width: 1280px; }
+.employee-calendar-card {
+  overflow: visible;
+  padding: 22px;
+  border: 1px solid #d8e2ec;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(37, 60, 86, .08);
+}
+.employee-calendar-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 16px; margin-bottom: 16px; }
+.calendar-month-title { display: flex; align-items: center; justify-content: center; gap: 9px; color: #254c70; }
+.calendar-month-title h2 { font-size: 22px; }
+.calendar-month-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: max-content;
+  padding: 9px 12px;
+  border: 1px solid #cddae6;
+  border-radius: 9px;
+  background: #f8fbfd;
+  color: #365b7d;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.calendar-month-button:last-child { justify-self: end; }
+.calendar-month-button:hover { background: #edf5fb; }
+.employee-calendar-legend { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; color: #5c6e80; font-size: 12px; }
+.employee-calendar-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.employee-calendar-legend i { width: 11px; height: 11px; border-radius: 3px; }
+.employee-calendar-legend .working-day { background: #fff; border: 1px solid #cbd9e5; }
+.employee-calendar-legend .weekend { background: #eef2f6; }
+.employee-calendar-legend .holiday { background: #ffe5e5; }
+.employee-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid #d8e2ec; border-left: 1px solid #d8e2ec; }
+.employee-calendar-weekday { padding: 9px 5px; border-right: 1px solid #d8e2ec; border-bottom: 1px solid #d8e2ec; background: #e7eff7; color: #415970; text-align: center; font-size: 12px; font-weight: 750; text-transform: uppercase; }
+.employee-calendar-day,
+.employee-calendar-blank { position: relative; min-height: 118px; padding: 10px; border-right: 1px solid #d8e2ec; border-bottom: 1px solid #d8e2ec; background: #fff; }
+.employee-calendar-blank { background: #f8fafc; }
+.employee-calendar-day.weekend { background: #f3f6f8; }
+.employee-calendar-day.holiday { background: #fff1f1; }
+.employee-calendar-day.special-leave { background: #fff1f1; }
+.employee-calendar-day.is-today { box-shadow: inset 0 0 0 2px #2c82c9; }
+.employee-calendar-day-heading { display: flex; align-items: baseline; gap: 6px; }
+.employee-calendar-day-heading strong { color: #203b56; font-size: 20px; }
+.employee-calendar-note { margin: 10px 0 0; color: #a14646; font-size: 12px; font-weight: 650; line-height: 1.3; }
+.birthday-marker { position: absolute; right: 9px; bottom: 9px; z-index: 2; }
+.birthday-marker button { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #e1a431; border-radius: 999px; background: #fff3c8; color: #ad6500; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
+.birthday-marker button:hover,
+.birthday-marker button:focus-visible { background: #ffe59b; }
+.birthday-popover {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: none;
+  min-width: 190px;
+  max-width: 260px;
+  padding: 10px 12px;
+  border: 1px solid #e2c77c;
+  border-radius: 10px;
+  background: #fffdf6;
+  box-shadow: 0 9px 24px rgba(51, 58, 67, .2);
+  color: #3f4b58;
+  line-height: 1.4;
+}
+.birthday-popover b,
+.birthday-popover span { display: block; }
+.birthday-popover b { margin-bottom: 4px; color: #a35a00; font-size: 12px; }
+.birthday-popover span { font-size: 13px; }
+.birthday-marker:hover .birthday-popover,
+.birthday-marker:focus-within .birthday-popover,
+.birthday-marker.is-open .birthday-popover { display: block; }
+
+@media (max-width: 720px) {
+  .employee-calendar-card { padding: 12px; overflow-x: auto; }
+  .employee-calendar-toolbar { min-width: 630px; }
+  .employee-calendar-legend { min-width: 630px; }
+  .employee-calendar-grid { min-width: 630px; }
+  .employee-calendar-day, .employee-calendar-blank { min-height: 100px; padding: 7px; }
+}

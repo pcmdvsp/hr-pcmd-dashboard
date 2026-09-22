@@ -7,6 +7,7 @@
 - Dashboard theo ngày, lọc theo phòng ban, tên/mã nhân viên và trạng thái.
 - Trạng thái: Working, Business trip, Annual leave, Sick leave và Meeting.
 - Work Calendar cho admin: ngày làm việc, cuối tuần, ngày lễ và ngày nghỉ đặc biệt.
+- Calendar cho toàn bộ nhân viên: hiển thị lịch làm việc/nghỉ lễ từ `work_calendar` (Holiday và Special leave được trình bày chung là Holiday), đánh dấu sinh nhật theo `profiles.birth_date` và ẩn năm sinh trên giao diện.
 - Monthly Statistics tính trực tiếp từ `daily_status` và `work_calendar`; không lưu bảng tổng tháng.
 - My Status gồm lịch 14 ngày, trạng thái cuối tuần/ngày lễ, Business trip kéo dài và overtime cuối tuần.
 - Meeting Info: tạo, sửa, hủy cuộc họp; người tham gia, nội dung, địa điểm, Online Link, kiểm tra trùng KNT meeting room và thêm nhanh thành viên theo phòng ban.
@@ -89,6 +90,7 @@ Nút **Reset password** trên Dashboard gọi Supabase Edge Function `admin-set-
 - Working/Meeting vào cuối tuần yêu cầu user xác nhận overtime.
 - Meeting được lưu trong `employee_meetings`; mỗi participant được lưu trong `employee_meeting_attendees`.
 - Khi meeting bị hủy, attendees bị xóa và bản ghi thông báo hủy được giữ trong `employee_meeting_cancellations` để gửi notification.
+- `profiles.birth_date` lưu ngày sinh đầy đủ; giao diện Calendar và banner chỉ dùng ngày/tháng và không hiển thị năm sinh.
 
 ## Thông báo meeting
 

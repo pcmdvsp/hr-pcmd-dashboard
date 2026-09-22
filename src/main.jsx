@@ -15,6 +15,7 @@ import UpdateStatusPage from "./pages/UpdateStatusPage";
 import AdminPage from "./pages/AdminPage";
 import MonthlyStatsPage from "./pages/MonthlyStatsPage";
 import WorkCalendarPage from "./pages/WorkCalendarPage";
+import CalendarPage from "./pages/CalendarPage";
 import MeetingInfoPage from "./pages/MeetingInfoPage";
 import RoomReservationAlert from "./components/RoomReservationAlert";
 import SuccessAlert from "./components/SuccessAlert";
@@ -85,6 +86,8 @@ function App() {
     return <UpdateStatusPage profile={profile} goBack={returnToDashboard} />;
   if (page === "meeting")
     return <MeetingInfoPage profile={profile} goBack={returnToDashboard} />;
+  if (page === "people-calendar")
+    return <CalendarPage goBack={returnToDashboard} />;
   if (page === "calendar" && profile.role === "admin")
     return <WorkCalendarPage goBack={returnToDashboard} />;
   return page === "admin" && profile.role === "admin" ? (
@@ -97,6 +100,7 @@ function App() {
       goAdmin={() => setPage("admin")}
       goMonthly={() => setPage("monthly")}
       goMeeting={() => setPage("meeting")}
+      goPeopleCalendar={() => setPage("people-calendar")}
       goProduction={() =>
         window.open(
           "https://nymphetamineanh.github.io/psc-dashboard-v2/",
