@@ -183,6 +183,25 @@ before pagination. It deliberately omits `nguoiDuyetFilter` to avoid excluding
 other Ban employees. The response is checked again against the exact QLHĐDK
 `donVi` name, while records remain otherwise unabridged for diagnostics.
 
+When **Test VSP leave** is selected, Admin can enter up to 50 employee numbers,
+separated by spaces, commas, semicolons, or new lines. A non-empty list runs a
+read-only test across units. It logs in once, queries each employee number
+sequentially through VSP's `nameFilter`, and returns only exact `danhSo` matches
+for the selected approval date. Leaving the list blank retains the current Ban
+QLHĐDK-scoped behavior. Employee-number filtering is rejected for sync and
+scheduled requests. The Admin request stops after 45 seconds and reports a
+timeout instead of leaving the action permanently busy.
+
+The same VSP session also reads approved compensatory leave from `/api/PhepBu`.
+Department scans use `DanhSachDonByBoPhan`; employee-number tests resolve each
+number through `NhanVienByDanhSo` and then call `DanhSachDon` sequentially. Only
+compensatory records in status `187` whose final approval date matches the scan
+date are accepted. Each detail uses VSP's `soNgay` as its leave-day count and
+keeps the supplied `tuNgay`–`denNgay` range; hours are retained for diagnostics
+and do not determine the number of leave days. The normalized rows continue to
+use `source = 'vsp'` and the existing annual leave notification and
+meeting-conflict handling.
+
 The Admin test action also synchronizes every returned `thongTinPhepCTs` period
 to `daily_status` by matching VSP `danhSo` to `profiles.employee_code`. Each day
 is stored as `leave`; `noiNghiPhep` is stored in `daily_status.note`, matching the

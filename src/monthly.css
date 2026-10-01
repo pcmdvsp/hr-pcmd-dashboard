@@ -9,6 +9,7 @@
 .monthly-controls input,
 .monthly-controls select,
 .calendar-admin input,
+.calendar-admin textarea,
 .calendar-admin select,
 .calendar-admin button {
   border: 1px solid #d6e0eb;
@@ -16,6 +17,13 @@
   border-radius: 8px;
   padding: 9px 11px;
   color: #34516f;
+}
+.work-calendar-note-input {
+  display: block;
+  width: 100%;
+  min-width: 280px;
+  resize: vertical;
+  line-height: 1.4;
 }
 .monthly-controls button {
   cursor: pointer;

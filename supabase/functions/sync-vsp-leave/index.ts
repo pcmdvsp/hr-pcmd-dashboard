@@ -1,4 +1,9 @@
 import { createClient } from "npm:@supabase/supabase-js@2";
+import {
+  APPROVED_COMPENSATORY_STATUS_ID,
+  compensatoryApprovalDate,
+  normalizeCompensatoryRecord,
+} from "./compensatory-leave.js";
 
 const VSP_BASE_URL = "https://phep.vietsov.com.vn";
 const APPROVED_STATUS_IDS = [142];
@@ -68,9 +73,12 @@ const loginDiagnostics = (value: unknown) => {
 const belongsToTargetUnit = (value: unknown): value is Record<string, unknown> =>
   isRecord(value) && value.donVi === TARGET_UNIT;
 
-const approvedOnDate = (value: unknown, selectedDate: string) =>
-  belongsToTargetUnit(value) && typeof value.ngayKy === "string" &&
+const approvedOnDate = (value: unknown, selectedDate: string): value is Record<string, unknown> =>
+  isRecord(value) && typeof value.ngayKy === "string" &&
   value.ngayKy.slice(0, 10) === selectedDate;
+
+const normalizeEmployeeCode = (value: unknown) =>
+  typeof value === "string" ? value.trim().toUpperCase() : "";
 
 const vietnamToday = () => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -124,6 +132,21 @@ const extractLeavePage = (value: unknown) => {
   throw new Error("VSP leave response has an unsupported pagination structure.");
 };
 
+const extractCompensatoryPage = (value: unknown) => {
+  if (Array.isArray(value)) return { records: value, total: value.length };
+  if (!isRecord(value))
+    throw new Error("VSP compensatory leave response has an unsupported structure.");
+  if (Array.isArray(value.items)) {
+    return {
+      records: value.items,
+      total: typeof value.total === "number" ? value.total : value.items.length,
+    };
+  }
+  if (Array.isArray(value.data)) return { records: value.data, total: value.data.length };
+  if (isRecord(value.data)) return extractCompensatoryPage(value.data);
+  throw new Error("VSP compensatory leave response has an unsupported structure.");
+};
+
 const dateOnly = (value: unknown) =>
   typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
     ? value.slice(0, 10)
@@ -139,6 +162,16 @@ const datesInRange = (start: string, end: string) => {
   }
   return dates;
 };
+
+const mergeSyncResults = (...results: Record<string, unknown>[]) => ({
+  createdDayCount: results.reduce((sum, result) => sum + Number(result.createdDayCount ?? 0), 0),
+  updatedDayCount: results.reduce((sum, result) => sum + Number(result.updatedDayCount ?? 0), 0),
+  unchangedDayCount: results.reduce((sum, result) => sum + Number(result.unchangedDayCount ?? 0), 0),
+  notificationCount: results.reduce((sum, result) => sum + Number(result.notificationCount ?? 0), 0),
+  syncedPeriodCount: results.reduce((sum, result) => sum + Number(result.syncedPeriodCount ?? 0), 0),
+  skipped: results.flatMap((result) => Array.isArray(result.skipped) ? result.skipped : []),
+  errors: results.flatMap((result) => Array.isArray(result.errors) ? result.errors : []),
+});
 
 const syncApprovedLeaves = async (
   client: ReturnType<typeof createClient>,
@@ -374,6 +407,103 @@ const getVspDepartmentScope = async (token: string, email: string) => {
   return isRecord(result) && "data" in result ? result.data : result;
 };
 
+const getVspEmployeeByCode = async (token: string, employeeCode: string) => {
+  const url = new URL(`${VSP_BASE_URL}/api/NhanVien/NhanVienByDanhSo`);
+  url.searchParams.set("danhSo", employeeCode);
+  url.searchParams.set("languageId", "VI");
+  const upstream = await fetchWithTimeout(url.toString(), {
+    method: "GET",
+    headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+  });
+  const result = await readUpstreamJson(upstream, `VSP employee lookup for ${employeeCode}`);
+  const records = Array.isArray(result)
+    ? result
+    : isRecord(result) && Array.isArray(result.data) ? result.data : [];
+  return records.find(isRecord) ?? null;
+};
+
+const fetchCompensatoryLeaves = async (
+  token: string,
+  departmentId: string | number | null,
+  employeeCodes: string[],
+) => {
+  const records: unknown[] = [];
+  const skippedEmployeeCodes: string[] = [];
+  let upstreamTotal = 0;
+  let upstreamPageCount = 0;
+  if (employeeCodes.length) {
+    for (const employeeCode of employeeCodes) {
+      const employee = await getVspEmployeeByCode(token, employeeCode);
+      const employeeId = employee?.nhanVien_id;
+      if (employeeId === null || employeeId === undefined) {
+        skippedEmployeeCodes.push(employeeCode);
+        continue;
+      }
+      const upstream = await fetchWithTimeout(
+        `${VSP_BASE_URL}/api/PhepBu/DanhSachDon`,
+        {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ NhanVien_id: employeeId }),
+        },
+      );
+      const page = extractCompensatoryPage(await readUpstreamJson(
+        upstream,
+        `VSP compensatory leave request for ${employeeCode}`,
+      ));
+      records.push(...page.records);
+      upstreamTotal += page.total;
+      upstreamPageCount += 1;
+    }
+    return { records, upstreamTotal, upstreamPageCount, skippedEmployeeCodes };
+  }
+
+  if (departmentId === null)
+    throw new Error("VSP department scope is required for compensatory leave sync.");
+  const pageSize = 1000;
+  const maxPages = 100;
+  let pageNumber = 1;
+  let fetchedCount = 0;
+  while (pageNumber <= maxPages) {
+    const upstream = await fetchWithTimeout(
+      `${VSP_BASE_URL}/api/PhepBu/DanhSachDonByBoPhan`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          BoPhan_id: departmentId,
+          TrangThai_ids: [APPROVED_COMPENSATORY_STATUS_ID],
+          Page: pageNumber,
+          PageSize: pageSize,
+          NgayNghiTuNgay: null,
+          NgayNghiDenNgay: null,
+        }),
+      },
+    );
+    const page = extractCompensatoryPage(await readUpstreamJson(
+      upstream,
+      `VSP compensatory leave request page ${pageNumber}`,
+    ));
+    records.push(...page.records);
+    fetchedCount += page.records.length;
+    if (pageNumber === 1) upstreamTotal = page.total;
+    upstreamPageCount += 1;
+    if (page.records.length < pageSize || fetchedCount >= page.total) break;
+    pageNumber += 1;
+  }
+  if (pageNumber > maxPages)
+    throw new Error("VSP compensatory leave pagination exceeded the safety limit.");
+  return { records, upstreamTotal, upstreamPageCount, skippedEmployeeCodes };
+};
+
 Deno.serve(async (request) => {
   const startedAt = new Date();
   if (request.method === "OPTIONS")
@@ -419,6 +549,7 @@ Deno.serve(async (request) => {
   let requestedFilters: Record<string, unknown> = {};
   let selectedDate = vietnamToday();
   let dryRun = false;
+  let requestedEmployeeCodes: string[] = [];
   let scheduleMode: "today" | "yesterday" = "today";
   try {
     const text = await request.text();
@@ -431,6 +562,15 @@ Deno.serve(async (request) => {
       selectedDate = body.date;
     }
     dryRun = body.dryRun === true;
+    if (body.employeeCodes !== undefined) {
+      if (!Array.isArray(body.employeeCodes))
+        return jsonResponse({ success: false, error: "employeeCodes must be an array of strings." }, 400);
+      requestedEmployeeCodes = [...new Set(body.employeeCodes.map(normalizeEmployeeCode).filter(Boolean))];
+      if (requestedEmployeeCodes.length > 50 || requestedEmployeeCodes.some((code) => code.length > 30))
+        return jsonResponse({ success: false, error: "Enter no more than 50 employee numbers, with at most 30 characters each." }, 400);
+      if (requestedEmployeeCodes.length && !dryRun)
+        return jsonResponse({ success: false, error: "Employee-number filtering is available for Test VSP leave only." }, 400);
+    }
     if (cronRequest) {
       if (body.mode !== "today" && body.mode !== "yesterday")
         return jsonResponse({ success: false, error: 'Scheduled body mode must be "today" or "yesterday".' }, 400);
@@ -482,67 +622,120 @@ Deno.serve(async (request) => {
 
   try {
     const { token, email } = await loginToVspLeave(username, password);
-    const departmentId = await getVspDepartmentScope(token, email);
-    if (
-      departmentId === null || departmentId === undefined ||
-      (typeof departmentId !== "number" &&
-        !(typeof departmentId === "string" && departmentId.trim()))
-    ) {
-      throw new Error("VSP department lookup did not return a valid department scope.");
+    let scopedFilters: Record<string, unknown> = { ...filters };
+    let departmentId: string | number | null = null;
+    if (!requestedEmployeeCodes.length) {
+      const departmentScope = await getVspDepartmentScope(token, email);
+      if (
+        departmentScope === null || departmentScope === undefined ||
+        (typeof departmentScope !== "number" &&
+          !(typeof departmentScope === "string" && departmentScope.trim()))
+      ) {
+        throw new Error("VSP department lookup did not return a valid department scope.");
+      }
+      departmentId = departmentScope;
+      scopedFilters = { ...filters, currentDepartmentFilter: departmentId };
+    } else {
+      delete scopedFilters.currentDepartmentFilter;
     }
-    const scopedFilters = {
-      ...filters,
-      currentDepartmentFilter: departmentId,
-    };
     const allRecords: unknown[] = [];
-    let pageNumber = 1;
+    let upstreamPageCount = 0;
     let upstreamTotal = 0;
-    const maxPages = 100;
-    while (pageNumber <= maxPages) {
-      const upstream = await fetchWithTimeout(
-        `${VSP_BASE_URL}/api/Phep/DanhSachGNPFilter`,
-        {
-          method: "POST",
-          headers: {
-            Accept: "application/json",
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+    const filterRequests = requestedEmployeeCodes.length
+      ? requestedEmployeeCodes.map((employeeCode) => ({
+          ...scopedFilters,
+          nameFilter: employeeCode,
+          pageSize: 100,
+        }))
+      : [scopedFilters];
+    for (const requestFilters of filterRequests) {
+      let pageNumber = 1;
+      let requestRecordCount = 0;
+      const maxPages = requestedEmployeeCodes.length ? 10 : 100;
+      while (pageNumber <= maxPages) {
+        const upstream = await fetchWithTimeout(
+          `${VSP_BASE_URL}/api/Phep/DanhSachGNPFilter`,
+          {
+            method: "POST",
+            headers: {
+              Accept: "application/json",
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ ...requestFilters, pageNumber }),
           },
-          body: JSON.stringify({ ...scopedFilters, pageNumber }),
-        },
-      );
-      const upstreamResponse = await readUpstreamJson(
-        upstream,
-        `VSP approved leave request page ${pageNumber}`,
-      );
-      const page = extractLeavePage(upstreamResponse);
-      allRecords.push(...page.records);
-      upstreamTotal = page.total;
-      if (page.records.length < scopedFilters.pageSize || allRecords.length >= upstreamTotal) break;
-      pageNumber += 1;
+        );
+        const upstreamResponse = await readUpstreamJson(
+          upstream,
+          `VSP approved leave request${requestedEmployeeCodes.length ? ` for ${requestFilters.nameFilter}` : ""} page ${pageNumber}`,
+        );
+        const page = extractLeavePage(upstreamResponse);
+        allRecords.push(...page.records);
+        requestRecordCount += page.records.length;
+        if (pageNumber === 1) upstreamTotal += page.total;
+        upstreamPageCount += 1;
+        if (page.records.length < Number(requestFilters.pageSize) || requestRecordCount >= page.total) break;
+        pageNumber += 1;
+      }
+      if (pageNumber > maxPages)
+        throw new Error(`VSP approved leave pagination exceeded the safety limit${requestedEmployeeCodes.length ? ` for ${requestFilters.nameFilter}` : ""}.`);
     }
-    if (pageNumber > maxPages)
-      throw new Error("VSP approved leave pagination exceeded the safety limit.");
 
-    const paginatedList = allRecords.filter((record) => approvedOnDate(record, selectedDate));
+    const employeeCodeSet = new Set(requestedEmployeeCodes);
+    const matchingRecords = allRecords.filter((record) =>
+      approvedOnDate(record, selectedDate) &&
+      (employeeCodeSet.size
+        ? employeeCodeSet.has(normalizeEmployeeCode(record.danhSo))
+        : belongsToTargetUnit(record))
+    );
+    const seenExternalIds = new Set<string>();
+    const paginatedList = matchingRecords.filter((record) => {
+      const externalId = String(record.donNghiPhep_id ?? JSON.stringify(record));
+      if (seenExternalIds.has(externalId)) return false;
+      seenExternalIds.add(externalId);
+      return true;
+    });
+    const compensatoryUpstream = await fetchCompensatoryLeaves(
+      token,
+      departmentId,
+      requestedEmployeeCodes,
+    );
+    const compensatoryRawRecords = compensatoryUpstream.records.filter((record) =>
+      isRecord(record) &&
+      Number(record.trangThai_id) === APPROVED_COMPENSATORY_STATUS_ID &&
+      compensatoryApprovalDate(record) === selectedDate &&
+      (!employeeCodeSet.size || employeeCodeSet.has(normalizeEmployeeCode(record.danhSo)))
+    );
+    const compensatoryEntries = compensatoryRawRecords.map((record) => ({
+      raw: record,
+      normalized: normalizeCompensatoryRecord(record),
+    }));
+    const compensatoryRecords = compensatoryEntries
+      .map((entry) => entry.normalized)
+      .filter((record): record is NonNullable<typeof record> => record !== null);
     const sync = dryRun
       ? { mode: "test", performed: false }
       : {
           mode: "sync",
           performed: true,
-          ...await syncApprovedLeaves(dataClient, paginatedList),
+          ...mergeSyncResults(
+            await syncApprovedLeaves(dataClient, paginatedList),
+            await syncApprovedLeaves(dataClient, compensatoryRecords),
+          ),
         };
+    const matchedRecordCount = paginatedList.length + compensatoryRecords.length;
+    const upstreamRecordCount = allRecords.length + compensatoryUpstream.records.length;
     if (cronRequest) {
       const failedCount = "errors" in sync && Array.isArray(sync.errors) ? sync.errors.length : 0;
       const changedCount = ("createdDayCount" in sync ? Number(sync.createdDayCount) : 0) +
         ("updatedDayCount" in sync ? Number(sync.updatedDayCount) : 0);
       const status = failedCount
-        ? changedCount || paginatedList.length ? "partial" : "failed"
-        : paginatedList.length ? "success" : "no_matches";
+        ? changedCount || matchedRecordCount ? "partial" : "failed"
+        : matchedRecordCount ? "success" : "no_matches";
       await writeScheduledLog({
         status,
-        upstream_record_count: allRecords.length,
-        matched_record_count: paginatedList.length,
+        upstream_record_count: upstreamRecordCount,
+        matched_record_count: matchedRecordCount,
         created_day_count: "createdDayCount" in sync ? sync.createdDayCount : 0,
         updated_day_count: "updatedDayCount" in sync ? sync.updatedDayCount : 0,
         unchanged_day_count: "unchangedDayCount" in sync ? sync.unchangedDayCount : 0,
@@ -553,19 +746,39 @@ Deno.serve(async (request) => {
         errors: "errors" in sync ? sync.errors : [],
       });
     }
-    const rawResponse = { pageIndex: 1, total: paginatedList.length, paginatedList };
+    const rawResponse = {
+      pageIndex: 1,
+      total: matchedRecordCount,
+      paginatedList,
+      compensatoryList: compensatoryEntries.map((entry) => ({
+        ...entry.raw,
+        normalizedLeave: entry.normalized,
+      })),
+    };
     return jsonResponse({
       success: true,
-      endpoint: "/api/Phep/DanhSachGNPFilter",
+      endpoints: [
+        "/api/Phep/DanhSachGNPFilter",
+        requestedEmployeeCodes.length
+          ? "/api/PhepBu/DanhSachDon"
+          : "/api/PhepBu/DanhSachDonByBoPhan",
+      ],
       mode: dryRun ? "test" : "sync",
       runType: cronRequest ? "scheduled" : "manual",
       selectedDate,
-      unit: TARGET_UNIT,
-      filters: scopedFilters,
+      unit: requestedEmployeeCodes.length ? null : TARGET_UNIT,
+      employeeCodes: requestedEmployeeCodes,
+      scope: requestedEmployeeCodes.length ? "employee_numbers" : "target_unit",
+      filters: requestedEmployeeCodes.length
+        ? { ...scopedFilters, nameFilter: requestedEmployeeCodes }
+        : scopedFilters,
       approvalDateField: "ngayKy",
-      upstreamRecordCount: allRecords.length,
-      upstreamTotal,
-      upstreamPageCount: pageNumber,
+      compensatoryApprovalStatusId: APPROVED_COMPENSATORY_STATUS_ID,
+      compensatoryDaySource: "VSP soNgay with tuNgay and denNgay",
+      compensatorySkippedEmployeeCodes: compensatoryUpstream.skippedEmployeeCodes,
+      upstreamRecordCount,
+      upstreamTotal: upstreamTotal + compensatoryUpstream.upstreamTotal,
+      upstreamPageCount: upstreamPageCount + compensatoryUpstream.upstreamPageCount,
       sync,
       rawResponse,
     });

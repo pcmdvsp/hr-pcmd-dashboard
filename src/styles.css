@@ -430,6 +430,21 @@ h2 {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+.vsp-leave-test-box {
+  grid-column: 1 / -1;
+  padding: 22px;
+  background: #fff;
+  border: 1px solid #d5e3ef;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px #172a3c14;
+}
+.vsp-leave-test-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+.vsp-leave-test-heading h3 { margin: 2px 0 0; }
+.vsp-leave-test-box > p { color: #526b82; line-height: 1.5; }
+.vsp-leave-test-box > label { display: block; margin: 18px 0 7px; font-weight: 700; }
+.vsp-leave-test-box textarea { width: 100%; resize: vertical; }
+.vsp-leave-test-box > small { display: block; margin-top: 7px; color: #718095; line-height: 1.45; }
+.vsp-leave-test-box .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .meeting-sync-log-panel { margin: 18px 0; padding: 15px; border: 1px solid #d5e3ef; border-radius: 12px; background: #f8fbfe; }
 .meeting-sync-log-panel > header { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
 .meeting-sync-log-panel .eyebrow { margin: 0 0 4px; }

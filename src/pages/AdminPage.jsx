@@ -16,6 +16,8 @@ export default function AdminPage({ data, profile, goBack }) {
   const [vspResult, setVspResult] = useState(null)
   const [vspError, setVspError] = useState('')
   const [vspLeaveDate, setVspLeaveDate] = useState('')
+  const [vspLeaveTestOpen, setVspLeaveTestOpen] = useState(false)
+  const [vspLeaveEmployeeCodes, setVspLeaveEmployeeCodes] = useState('')
   const [meetingBusy, setMeetingBusy] = useState(false)
   const [meetingResult, setMeetingResult] = useState(null)
   const [meetingError, setMeetingError] = useState('')
@@ -67,40 +69,58 @@ export default function AdminPage({ data, profile, goBack }) {
     catch (error) { setPushMessage(error.message || 'Unable to send the test notification.') }
     setPushBusy(false)
   }
-  const testVspLeave = async (dryRun = false) => {
+  const testVspLeave = async (dryRun = false, employeeCodes = []) => {
     setVspBusy(true); setVspResult(null); setVspError('')
-    const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession()
-    const accessToken = sessionData?.session?.access_token
-    if (sessionError || !accessToken) {
-      setVspError('Your dashboard session has expired. Please sign out and sign in again.')
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 45_000)
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession()
+      const accessToken = sessionData?.session?.access_token
+      if (sessionError || !accessToken) {
+        setVspError('Your dashboard session has expired. Please sign out and sign in again.')
+        return
+      }
+      const { data: result, error } = await supabase.functions.invoke('sync-vsp-leave', {
+        body: { date: vspLeaveDate, dryRun, ...(employeeCodes.length ? { employeeCodes } : {}) },
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal,
+      })
+      if (error) {
+        let message = error.message || 'Unable to test the VSP leave API.'
+        try {
+          const details = await error.context?.json()
+          if (details?.error) message = details.error
+          if (details) setVspResult(details)
+        } catch { /* Keep the function client error above. */ }
+        setVspError(message)
+      } else if (!result?.success) {
+        setVspError(result?.error || 'The VSP leave API test failed.')
+      } else {
+        setVspResult(result)
+        const raw = result?.rawResponse
+        const count = Array.isArray(raw) ? raw.length : raw?.total
+        const changedDays = (result?.sync?.createdDayCount ?? 0) + (result?.sync?.updatedDayCount ?? 0)
+        showSuccessAlert(dryRun
+          ? `VSP leave test returned${Number.isFinite(count) ? ` ${count} approved record(s)` : ' JSON data'}. No data was synchronized.`
+          : `VSP leave API returned${Number.isFinite(count) ? ` ${count} record(s)` : ' JSON data'} and synchronized ${changedDays} leave day(s).`)
+        if (!dryRun && changedDays) await reload()
+      }
+    } catch (error) {
+      setVspError(error?.name === 'AbortError'
+        ? 'The VSP leave test did not finish within 45 seconds. Please try fewer employee numbers.'
+        : error?.message || 'Unable to test the VSP leave API.')
+    } finally {
+      window.clearTimeout(timeout)
       setVspBusy(false)
-      return
     }
-    const { data: result, error } = await supabase.functions.invoke('sync-vsp-leave', {
-      body: { date: vspLeaveDate, dryRun },
-      headers: { Authorization: `Bearer ${accessToken}` },
-    })
-    if (error) {
-      let message = error.message || 'Unable to test the VSP leave API.'
-      try {
-        const details = await error.context?.json()
-        if (details?.error) message = details.error
-        if (details) setVspResult(details)
-      } catch { /* Keep the function client error above. */ }
-      setVspError(message)
-    } else if (!result?.success) {
-      setVspError(result?.error || 'The VSP leave API test failed.')
-    } else {
-      setVspResult(result)
-      const raw = result?.rawResponse
-      const count = Array.isArray(raw) ? raw.length : raw?.paginatedList?.length
-      const changedDays = (result?.sync?.createdDayCount ?? 0) + (result?.sync?.updatedDayCount ?? 0)
-      showSuccessAlert(dryRun
-        ? `VSP leave test returned${Number.isFinite(count) ? ` ${count} approved record(s)` : ' JSON data'}. No data was synchronized.`
-        : `VSP leave API returned${Number.isFinite(count) ? ` ${count} record(s)` : ' JSON data'} and synchronized ${changedDays} leave day(s).`)
-      if (!dryRun && changedDays) await reload()
-    }
-    setVspBusy(false)
+  }
+  const runVspLeaveTest = () => {
+    const employeeCodes = [...new Set(vspLeaveEmployeeCodes
+      .split(/[\s,;]+/)
+      .map(value => value.trim().toUpperCase())
+      .filter(Boolean))]
+    setVspLeaveTestOpen(false)
+    void testVspLeave(true, employeeCodes)
   }
   const getVspMeetingInfo = async (dryRun = false) => {
     setMeetingBusy(true); setMeetingResult(null); setMeetingError('')
@@ -164,7 +184,15 @@ export default function AdminPage({ data, profile, goBack }) {
           <input id="vsp-leave-test-date" type="date" value={vspLeaveDate} onChange={event => setVspLeaveDate(event.target.value)} disabled={vspBusy} aria-describedby="vsp-leave-test-date-help" />
           <small id="vsp-leave-test-date-help">Find records whose ngayKy is on this date. Leave blank to use today in Vietnam (UTC+7).</small>
         </div>
-        <div className="vsp-action-buttons"><button className="primary-button vsp-get-button" disabled={vspBusy} onClick={() => testVspLeave(false)}>{vspBusy ? 'Working...' : 'Get VSP leave info'}</button><button className="secondary-button" disabled={vspBusy} onClick={() => testVspLeave(true)}>{vspBusy ? 'Working...' : 'Test VSP leave'}</button></div>
+        <div className="vsp-action-buttons"><button className="primary-button vsp-get-button" type="button" disabled={vspBusy} onClick={() => testVspLeave(false)}>{vspBusy ? 'Working...' : 'Get VSP leave info'}</button><button className="secondary-button" type="button" disabled={vspBusy} onClick={() => setVspLeaveTestOpen(true)}>{vspBusy ? 'Working...' : 'Test VSP leave'}</button></div>
+        {vspLeaveTestOpen && <div className="vsp-leave-test-box" role="group" aria-labelledby="vsp-leave-test-title">
+          <div className="vsp-leave-test-heading"><div><p className="eyebrow">VSP LEAVE TEST</p><h3 id="vsp-leave-test-title">Test employee numbers</h3></div><button className="close" type="button" aria-label="Close" onClick={() => setVspLeaveTestOpen(false)}>×</button></div>
+          <p>Enter one or more employee numbers to test them directly, including employees outside Ban QLHĐDK.</p>
+          <label htmlFor="vsp-leave-employee-codes">Employee numbers (optional)</label>
+          <textarea id="vsp-leave-employee-codes" rows="5" autoFocus value={vspLeaveEmployeeCodes} onChange={event => setVspLeaveEmployeeCodes(event.target.value)} placeholder={'18351\n07HDDK'} />
+          <small>Separate values with spaces, commas, semicolons, or new lines. Leave blank to use the current Ban QLHĐDK scope.</small>
+          <div className="dialog-actions"><button className="secondary-button" type="button" onClick={() => setVspLeaveTestOpen(false)}>Cancel</button><button className="primary-button" type="button" onClick={runVspLeaveTest}>Run test</button></div>
+        </div>}
         {vspError && <p className="form-error">{vspError}</p>}
         {vspResult && <pre className="vsp-test-result">{JSON.stringify(vspResult, null, 2)}</pre>}
       </section>
