@@ -139,14 +139,12 @@
 .today-events-list { display: grid; gap: 5px; }
 .today-events-list span {
   display: block;
-  padding: 5px 8px;
-  border-radius: 6px;
   font-size: 14px;
   font-weight: 700;
   line-height: 1.35;
 }
-.today-events-list span:nth-child(odd) { background: #dceeff; color: #255e90; }
-.today-events-list span:nth-child(even) { background: #ffe6dc; color: #963f35; }
+.today-events-list span:nth-child(odd) { color: #255e90; }
+.today-events-list span:nth-child(even) { color: #963f35; }
 
 .birthday-banner {
   display: flex;

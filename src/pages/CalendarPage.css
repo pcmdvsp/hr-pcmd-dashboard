@@ -47,9 +47,8 @@
 .employee-calendar-note { margin: 10px 0 0; color: #a14646; font-size: 12px; font-weight: 650; line-height: 1.3; }
 .employee-calendar-note span { display: block; white-space: pre-wrap; }
 .employee-calendar-note.is-multiline { display: grid; gap: 4px; }
-.employee-calendar-note.is-multiline span { padding: 4px 6px; border-radius: 5px; }
-.employee-calendar-note.is-multiline span:nth-child(odd) { background: #ffe0d6; color: #963d32; }
-.employee-calendar-note.is-multiline span:nth-child(even) { background: #dfeeff; color: #285f91; }
+.employee-calendar-note.is-multiline span:nth-child(odd) { color: #963d32; }
+.employee-calendar-note.is-multiline span:nth-child(even) { color: #285f91; }
 .birthday-marker { position: absolute; top: 9px; right: 9px; z-index: 2; }
 .birthday-marker button { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #e1a431; border-radius: 999px; background: #fff3c8; color: #ad6500; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
 .birthday-marker button:hover,
