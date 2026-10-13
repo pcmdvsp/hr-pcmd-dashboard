@@ -114,6 +114,40 @@
   padding: 9px 15px;
 }
 
+.today-events-banner {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 14px;
+  margin: -12px 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #83b4dc;
+  border-left: 5px solid #2c82c9;
+  border-radius: 11px;
+  background: linear-gradient(100deg, #edf7ff, #f8fcff);
+  color: #244f73;
+  box-shadow: 0 5px 14px rgba(44, 130, 201, .12);
+}
+.today-events-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding-top: 4px;
+  white-space: nowrap;
+  letter-spacing: .035em;
+}
+.today-events-list { display: grid; gap: 5px; }
+.today-events-list span {
+  display: block;
+  padding: 5px 8px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.today-events-list span:nth-child(odd) { background: #dceeff; color: #255e90; }
+.today-events-list span:nth-child(even) { background: #ffe6dc; color: #963f35; }
+
 .birthday-banner {
   display: flex;
   align-items: center;
@@ -127,6 +161,7 @@
   color: #7c4b00;
   box-shadow: 0 5px 14px rgba(134, 91, 11, .1);
 }
+.today-events-banner + .birthday-banner { margin-top: -12px; }
 .birthday-banner-icon { display: inline-flex; flex: 0 0 auto; }
 .birthday-banner-window { min-width: 0; overflow: hidden; flex: 1; }
 .birthday-banner p {
@@ -142,6 +177,9 @@
 @keyframes birthday-banner-scroll { from { transform: translateX(0); } to { transform: translateX(-100%); } }
 @media (prefers-reduced-motion: reduce) {
   .birthday-banner p { width: auto; padding-left: 0; white-space: normal; animation: none; }
+}
+@media (max-width: 640px) {
+  .today-events-banner { grid-template-columns: 1fr; gap: 8px; }
 }
 
 .production-dashboard-tab {

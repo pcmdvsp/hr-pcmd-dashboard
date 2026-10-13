@@ -33,7 +33,7 @@
 .employee-calendar-legend .working-day { background: #fff; border: 1px solid #cbd9e5; }
 .employee-calendar-legend .weekend { background: #eef2f6; }
 .employee-calendar-legend .holiday { background: #ffe5e5; }
-.employee-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-top: 1px solid #d8e2ec; border-left: 1px solid #d8e2ec; }
+.employee-calendar-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) repeat(2, minmax(0, .5fr)); border-top: 1px solid #d8e2ec; border-left: 1px solid #d8e2ec; }
 .employee-calendar-weekday { padding: 9px 5px; border-right: 1px solid #d8e2ec; border-bottom: 1px solid #d8e2ec; background: #e7eff7; color: #415970; text-align: center; font-size: 12px; font-weight: 750; text-transform: uppercase; }
 .employee-calendar-day,
 .employee-calendar-blank { position: relative; min-height: 118px; padding: 10px; border-right: 1px solid #d8e2ec; border-bottom: 1px solid #d8e2ec; background: #fff; }
@@ -44,15 +44,20 @@
 .employee-calendar-day.is-today { box-shadow: inset 0 0 0 2px #2c82c9; }
 .employee-calendar-day-heading { display: flex; align-items: baseline; gap: 6px; }
 .employee-calendar-day-heading strong { color: #203b56; font-size: 20px; }
-.employee-calendar-note { margin: 10px 0 0; color: #a14646; font-size: 12px; font-weight: 650; line-height: 1.3; white-space: pre-wrap; }
-.birthday-marker { position: absolute; right: 9px; bottom: 9px; z-index: 2; }
+.employee-calendar-note { margin: 10px 0 0; color: #a14646; font-size: 12px; font-weight: 650; line-height: 1.3; }
+.employee-calendar-note span { display: block; white-space: pre-wrap; }
+.employee-calendar-note.is-multiline { display: grid; gap: 4px; }
+.employee-calendar-note.is-multiline span { padding: 4px 6px; border-radius: 5px; }
+.employee-calendar-note.is-multiline span:nth-child(odd) { background: #ffe0d6; color: #963d32; }
+.employee-calendar-note.is-multiline span:nth-child(even) { background: #dfeeff; color: #285f91; }
+.birthday-marker { position: absolute; top: 9px; right: 9px; z-index: 2; }
 .birthday-marker button { display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid #e1a431; border-radius: 999px; background: #fff3c8; color: #ad6500; font: inherit; font-size: 12px; font-weight: 750; cursor: pointer; }
 .birthday-marker button:hover,
 .birthday-marker button:focus-visible { background: #ffe59b; }
 .birthday-popover {
   position: absolute;
   right: 0;
-  bottom: calc(100% + 8px);
+  top: calc(100% + 8px);
   display: none;
   min-width: 190px;
   max-width: 260px;

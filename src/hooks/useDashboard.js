@@ -25,6 +25,7 @@ export function useDashboard(selectedDate = today(), userId) {
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [calendarDay, setCalendarDay] = useState(() => fallbackCalendarDay(selectedDate))
+  const [todayCalendarDay, setTodayCalendarDay] = useState(() => fallbackCalendarDay(today()))
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const statusCache = useRef(new Map())
@@ -32,10 +33,11 @@ export function useDashboard(selectedDate = today(), userId) {
 
   const load = useCallback(async (forceStatusRefresh = false) => {
     if (!supabase || !userId) {
-      setEmployees([]); setDepartments([]); setCalendarDay(fallbackCalendarDay(date)); setError(''); setLoading(false)
+      setEmployees([]); setDepartments([]); setCalendarDay(fallbackCalendarDay(date)); setTodayCalendarDay(fallbackCalendarDay(today())); setError(''); setLoading(false)
       return
     }
     setLoading(true); setError('')
+    const currentDate = today()
     const statusMonth = monthBounds(date)
     const cachedStatuses = forceStatusRefresh ? null : statusCache.current.get(statusMonth.start)
     const statusRequest = cachedStatuses
@@ -45,18 +47,22 @@ export function useDashboard(selectedDate = today(), userId) {
           .select('employee_id,date,status,note,content,location,start_time,end_time,is_overtime,source,updated_at')
           .gte('date', statusMonth.start)
           .lt('date', statusMonth.end)
-    const [profileRes, statusRes, deptRes, calendarRes, meetingRes] = await Promise.all([
+    const [profileRes, statusRes, deptRes, calendarRes, todayCalendarRes, meetingRes] = await Promise.all([
       supabase.from('profiles').select('*, departments(id,name,sort_order)').eq('active', true).order('full_name'),
       statusRequest,
       supabase.from('departments').select('*').order('sort_order'),
       supabase.from('work_calendar').select('date,day_type,holiday_name').eq('date', date).maybeSingle(),
+      currentDate === date
+        ? Promise.resolve({ data: null, error: null })
+        : supabase.from('work_calendar').select('date,day_type,holiday_name').eq('date', currentDate).maybeSingle(),
       supabase.from('employee_meetings').select('organizer_id,is_overtime').eq('date', date).eq('is_overtime', true),
     ])
-    if (profileRes.error || statusRes.error || deptRes.error || calendarRes.error || meetingRes.error) {
-      setError(profileRes.error?.message || statusRes.error?.message || deptRes.error?.message || calendarRes.error?.message || meetingRes.error?.message)
+    if (profileRes.error || statusRes.error || deptRes.error || calendarRes.error || todayCalendarRes.error || meetingRes.error) {
+      setError(profileRes.error?.message || statusRes.error?.message || deptRes.error?.message || calendarRes.error?.message || todayCalendarRes.error?.message || meetingRes.error?.message)
     }
     if (!statusRes.error && !cachedStatuses) statusCache.current.set(statusMonth.start, statusRes.data || [])
     setCalendarDay(calendarRes.data || fallbackCalendarDay(date))
+    setTodayCalendarDay((currentDate === date ? calendarRes.data : todayCalendarRes.data) || fallbackCalendarDay(currentDate))
     const statusesByEmployee = new Map()
     ;(statusRes.data || []).forEach(record => {
       if (!statusesByEmployee.has(record.employee_id)) statusesByEmployee.set(record.employee_id, new Map())
@@ -112,5 +118,5 @@ export function useDashboard(selectedDate = today(), userId) {
       supabase.removeChannel(channel)
     }
   }, [date, load, userId])
-  return { employees, departments, calendarDay, isWorkingDay: calendarDay.day_type === 'working_day', loading, error, date, reload: () => load(true) }
+  return { employees, departments, calendarDay, todayCalendarDay, isWorkingDay: calendarDay.day_type === 'working_day', loading, error, date, reload: () => load(true) }
 }

@@ -62,9 +62,10 @@ export default function CalendarPage({ goBack }) {
           if (!day) return <div className="employee-calendar-blank" key={`blank-${index}`} aria-hidden="true"/>
           const dayBirthdays = birthdays.get(day.date.slice(5)) || []
           const isOpen = openBirthday === day.date
+          const holidayLines = day.holiday_name?.split(/\r?\n/).map(line => line.trim()).filter(Boolean) || []
           return <article className={`employee-calendar-day ${day.day_type.replace('_', '-')} ${day.date === currentDate ? 'is-today' : ''}`} key={day.date}>
             <div className="employee-calendar-day-heading"><strong>{Number(day.date.slice(-2))}</strong></div>
-            {day.holiday_name && <p className="employee-calendar-note">{day.holiday_name}</p>}
+            {holidayLines.length > 0 && <div className={`employee-calendar-note ${holidayLines.length > 1 ? 'is-multiline' : ''}`}>{holidayLines.map((line, lineIndex) => <span key={`${day.date}-note-${lineIndex}`}>{line}</span>)}</div>}
             {dayBirthdays.length > 0 && <div className={`birthday-marker ${isOpen ? 'is-open' : ''}`}>
               <button type="button" aria-label={`Show birthdays on ${day.date}`} aria-expanded={isOpen} onClick={() => setOpenBirthday(current => current === day.date ? '' : day.date)}><Cake size={19}/><span>{dayBirthdays.length}</span></button>
               <div className="birthday-popover" role="tooltip"><b>{dayBirthdays.length === 1 ? 'Birthday' : 'Birthdays'}</b>{dayBirthdays.map(person => <span key={person.id}>{person.full_name}</span>)}</div>

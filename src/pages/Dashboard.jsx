@@ -9,6 +9,7 @@ import ResetPasswordDialog from '../components/ResetPasswordDialog'
 import MeetingNotifications from '../components/MeetingNotifications'
 import MonthlyEmployeeTimeline from '../components/MonthlyEmployeeTimeline'
 import BirthdayBanner from '../components/BirthdayBanner'
+import TodayEventsBanner from '../components/TodayEventsBanner'
 import { formatDateTime, today } from '../utils/status'
 
 const formatHeaderDate = value => new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' }).format(value)
@@ -18,7 +19,7 @@ const moveDate = (date, amount) => { const value = new Date(`${date}T12:00:00`);
 const moveMonth = (date, amount) => { const value = new Date(`${date}T12:00:00`); value.setMonth(value.getMonth() + amount); return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-01` }
 
 export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly, goMeeting, goPeopleCalendar, goProduction, goUpdate, goCalendar, onDateChange }) {
-  const { employees, departments, calendarDay, isWorkingDay, loading, error, date } = data
+  const { employees, departments, calendarDay, todayCalendarDay, isWorkingDay, loading, error, date } = data
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
   const [departmentFilter, setDepartmentFilter] = useState('all')
@@ -52,6 +53,7 @@ export default function Dashboard({ profile, data, onSignOut, goAdmin, goMonthly
       <div><p className="eyebrow">PCMD - Vietsovpetro JV</p><h1>WORKING STATUS DASHBOARD</h1><p className="subtle">Last updated: {formatDateTime(latest)}</p></div>
       <div className="header-actions-wrap"><div className="top-actions"><span className="user-chip">{isPreviewing ? `${previewEmployee.full_name} · Preview` : profile.full_name}</span>{!isPreviewing && <button className="secondary-button" onClick={goUpdate}>My Status</button>}{profile.role === 'admin' && !isPreviewing && <><button className="secondary-button" onClick={goAdmin}>Admin</button><button className="secondary-button" onClick={goCalendar}>Work calendar</button><button className="secondary-button reset-button" onClick={() => setResetPassword(true)}>Reset password</button></>}{isPreviewing && <button className="secondary-button" onClick={() => setPreviewEmployeeId('')}>Exit preview</button>}<button className="text-button" onClick={onSignOut}>Sign out</button><MeetingNotifications employeeId={notificationEmployeeId} onOpenMeetingInfo={goMeeting} readOnly={isPreviewing}/></div><time className="header-clock">{formatHeaderDate(now)}<br/><b>{formatHeaderTime(now)}</b></time></div>
     </header>
+    <TodayEventsBanner calendarDay={todayCalendarDay}/>
     <BirthdayBanner employees={employees}/>
     {profile.role === 'admin' && <section className={`user-preview-bar ${isPreviewing ? 'is-active' : ''}`}><div><strong>Preview as user</strong><span>{isPreviewing ? 'Read-only mode. Opening notifications will not change the selected user’s read status.' : 'Select a normal user to verify their dashboard notifications.'}</span></div><select value={previewEmployeeId} onChange={event => setPreviewEmployeeId(event.target.value)}><option value="">Not previewing</option>{employees.filter(employee => employee.id !== profile.id && employee.role !== 'admin').map(employee => <option key={employee.id} value={employee.id}>{employee.full_name} ({employee.employee_code})</option>)}</select></section>}
     <nav className="dashboard-navigation" aria-label="Dashboard pages"><button className="secondary-button" onClick={goMonthly}>Monthly statistics</button>{!isPreviewing && <button className="secondary-button" onClick={goMeeting}>Meeting Info</button>}<button className="secondary-button" onClick={goPeopleCalendar}>Calendar</button><button className="production-dashboard-tab" onClick={goProduction}>Block 09-2/09 production</button></nav>
