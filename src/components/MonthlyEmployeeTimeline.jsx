@@ -12,6 +12,7 @@ const shortWeekday = date => new Intl.DateTimeFormat('en-GB', { weekday: 'short'
 const monthTitle = month => new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`))
 const addDays = (date, count) => { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() + count); return value.toISOString().slice(0, 10) }
 const laterDate = (first, second) => first > second ? first : second
+const isCalendarHoliday = day => day.day_type === 'holiday' || day.day_type === 'special_leave'
 const editableStatuses = new Set(['business_trip', 'leave', 'sick'])
 
 export default function MonthlyEmployeeTimeline({ month, employees, departments, query, departmentFilter, profile }) {
@@ -62,7 +63,7 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
       const record = personStatuses.get(date)
       const calendarDay = calendarByDate.get(date) || { day_type: fallbackDayType(date) }
       const status = record?.status === 'meeting' ? 'working' : record?.status || (calendarDay.day_type === 'working_day' ? 'working' : null)
-      return { status, dayType: calendarDay.day_type, holidayName: calendarDay.holiday_name, isHoliday: calendarDay.day_type === 'holiday' || Boolean(calendarDay.holiday_name), date, isToday: date === today(), content: record?.content, location: record?.location, note: record?.note }
+      return { status, dayType: calendarDay.day_type, holidayName: calendarDay.holiday_name, isHoliday: isCalendarHoliday(calendarDay), date, isToday: date === today(), content: record?.content, location: record?.location, note: record?.note }
     })
     return cells.reduce((segments, cell, dayIndex) => {
       // Keep ordinary working days as individual blank cells. Explicit status
@@ -92,7 +93,7 @@ export default function MonthlyEmployeeTimeline({ month, employees, departments,
   return <section className="monthly-timeline-panel">
     <header><div><p className="eyebrow">MONTHLY EMPLOYEE OVERVIEW</p><h2>{monthTitle(month)}</h2></div><p>{shownEmployees.length} employees · {days.length} days</p></header>
     <div className="monthly-timeline-wrap"><table className="monthly-timeline-table">
-      <thead><tr><th className="timeline-employee-header">Employee</th>{days.map(date => { const calendarDay = calendarByDate.get(date) || { day_type: fallbackDayType(date) }; return <th className={`${date === today() ? 'is-today' : ''} ${calendarDay.day_type === 'weekend' ? 'is-weekend' : ''} ${calendarDay.day_type === 'holiday' || calendarDay.holiday_name ? 'is-holiday' : ''}`} key={date}><small>{shortWeekday(date)}</small><b>{date.slice(-2)}</b></th> })}</tr></thead>
+      <thead><tr><th className="timeline-employee-header">Employee</th>{days.map(date => { const calendarDay = calendarByDate.get(date) || { day_type: fallbackDayType(date) }; return <th className={`${date === today() ? 'is-today' : ''} ${calendarDay.day_type === 'weekend' ? 'is-weekend' : ''} ${isCalendarHoliday(calendarDay) ? 'is-holiday' : ''}`} key={date}><small>{shortWeekday(date)}</small><b>{date.slice(-2)}</b></th> })}</tr></thead>
       <tbody>{groups.map(group => <TimelineGroup key={group.id} group={group} days={days} segmentsFor={segmentsFor} collapsed={collapsedGroups.has(group.id)} onToggle={toggleGroup} profile={profile} onEdit={setStatusAction}/>)}</tbody>
     </table></div>
     {!groups.length && <p className="empty">No matching employees found.</p>}
