@@ -192,6 +192,18 @@ QLHĐDK-scoped behavior. Employee-number filtering is rejected for sync and
 scheduled requests. The Admin request stops after 45 seconds and reports a
 timeout instead of leaving the action permanently busy.
 
+Admin also provides **Search employee VSP leave**, a separate read-only lookup
+for one employee number and a required From–To leave-date range of at most 366
+days. It returns approved annual leave (status `142`) and approved compensatory
+leave (status `187`) as a normalized table without writing `daily_status` or
+creating notifications. The browser makes one Edge Function call. The Function
+logs in once and requests regular leave by `nameFilter`. VSP leave-date filters
+are deliberately left empty because they exclude periods that only overlap a
+range boundary; the Function filters the employee's returned periods locally by
+exact `danhSo` and date-range overlap. It separately resolves the employee for
+the compensatory endpoint. Redeploy
+`sync-vsp-leave` after updating this feature; no SQL migration is required.
+
 The same VSP session also reads approved compensatory leave from `/api/PhepBu`.
 Department scans use `DanhSachDonByBoPhan`; employee-number tests resolve each
 number through `NhanVienByDanhSo` and then call `DanhSachDon` sequentially. Only

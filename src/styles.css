@@ -445,6 +445,19 @@ h2 {
 .vsp-leave-test-box textarea { width: 100%; resize: vertical; }
 .vsp-leave-test-box > small { display: block; margin-top: 7px; color: #718095; line-height: 1.45; }
 .vsp-leave-test-box .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.vsp-employee-leave-search { grid-template-columns: minmax(240px, .7fr) minmax(0, 1.3fr); align-items: start; }
+.vsp-leave-search-fields { display: grid !important; grid-template-columns: minmax(170px, 1.2fr) repeat(2, minmax(135px, 1fr)) auto; align-items: end; gap: 10px; }
+.vsp-leave-search-fields label { display: grid; gap: 6px; color: #304f6d; font-size: 12px; font-weight: 700; }
+.vsp-leave-search-fields input { width: 100%; min-height: 40px; padding: 8px 10px; border: 1px solid #cbdbea; border-radius: 8px; background: #fff; color: #203d59; font: inherit; font-weight: 400; }
+.vsp-leave-search-fields .primary-button { width: auto; min-height: 40px; white-space: nowrap; }
+.vsp-employee-leave-search > .form-error,
+.vsp-leave-search-results { grid-column: 1 / -1; }
+.vsp-leave-search-results { display: block !important; width: 100%; }
+.vsp-leave-search-summary { display: flex; justify-content: space-between; gap: 14px; margin-bottom: 10px; color: #526b82; font-size: 12px; }
+.vsp-leave-search-summary b { color: #203d59; font-size: 14px; }
+.vsp-leave-search-table td small { display: block; margin-top: 2px; }
+.vsp-leave-search-table th:last-child,
+.vsp-leave-search-table td:last-child { min-width: 170px; white-space: normal; }
 .meeting-sync-log-panel { margin: 18px 0; padding: 15px; border: 1px solid #d5e3ef; border-radius: 12px; background: #f8fbfe; }
 .meeting-sync-log-panel > header { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
 .meeting-sync-log-panel .eyebrow { margin: 0 0 4px; }
@@ -500,4 +513,8 @@ h2 {
   }
   .vsp-action-panel .vsp-date-field input { margin-left: 0; }
   .vsp-action-panel .vsp-get-button { width: 100%; }
+  .vsp-employee-leave-search { grid-template-columns: 1fr; }
+  .vsp-leave-search-fields { grid-template-columns: 1fr !important; }
+  .vsp-leave-search-fields .primary-button { width: 100%; }
+  .vsp-leave-search-summary { align-items: flex-start; flex-direction: column; gap: 4px; }
 }

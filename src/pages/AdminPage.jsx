@@ -6,6 +6,10 @@ import { showSuccessAlert } from '../components/SuccessAlert'
 import { supabase } from '../lib/supabaseClient'
 import { enablePushNotifications, pushSupported, sendTestPushNotification } from '../utils/pushNotifications'
 
+const formatSearchDate = value => value
+  ? new Intl.DateTimeFormat('en-GB').format(new Date(`${value}T12:00:00`))
+  : '—'
+
 export default function AdminPage({ data, profile, goBack }) {
   const { employees, departments, date, reload } = data
   const [query, setQuery] = useState('')
@@ -18,6 +22,12 @@ export default function AdminPage({ data, profile, goBack }) {
   const [vspLeaveDate, setVspLeaveDate] = useState('')
   const [vspLeaveTestOpen, setVspLeaveTestOpen] = useState(false)
   const [vspLeaveEmployeeCodes, setVspLeaveEmployeeCodes] = useState('')
+  const [leaveSearchEmployeeCode, setLeaveSearchEmployeeCode] = useState('')
+  const [leaveSearchFromDate, setLeaveSearchFromDate] = useState('')
+  const [leaveSearchToDate, setLeaveSearchToDate] = useState('')
+  const [leaveSearchBusy, setLeaveSearchBusy] = useState(false)
+  const [leaveSearchResult, setLeaveSearchResult] = useState(null)
+  const [leaveSearchError, setLeaveSearchError] = useState('')
   const [meetingBusy, setMeetingBusy] = useState(false)
   const [meetingResult, setMeetingResult] = useState(null)
   const [meetingError, setMeetingError] = useState('')
@@ -122,6 +132,56 @@ export default function AdminPage({ data, profile, goBack }) {
     setVspLeaveTestOpen(false)
     void testVspLeave(true, employeeCodes)
   }
+  const searchEmployeeVspLeave = async () => {
+    const employeeCode = leaveSearchEmployeeCode.trim().toUpperCase()
+    setLeaveSearchError(''); setLeaveSearchResult(null)
+    if (!employeeCode) return setLeaveSearchError('Employee number is required.')
+    if (!leaveSearchFromDate || !leaveSearchToDate) return setLeaveSearchError('From and To dates are required.')
+    if (leaveSearchToDate < leaveSearchFromDate) return setLeaveSearchError('To date must be on or after From date.')
+    const inclusiveDays = Math.floor((Date.parse(`${leaveSearchToDate}T00:00:00Z`) - Date.parse(`${leaveSearchFromDate}T00:00:00Z`)) / 86_400_000) + 1
+    if (inclusiveDays > 366) return setLeaveSearchError('The search range cannot exceed 366 days.')
+    setLeaveSearchBusy(true)
+    const controller = new AbortController()
+    const timeout = window.setTimeout(() => controller.abort(), 60_000)
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession()
+      const accessToken = sessionData?.session?.access_token
+      if (sessionError || !accessToken) {
+        setLeaveSearchError('Your dashboard session has expired. Please sign out and sign in again.')
+        return
+      }
+      const { data: result, error } = await supabase.functions.invoke('sync-vsp-leave', {
+        body: {
+          action: 'employee_range_search',
+          employeeCode,
+          fromDate: leaveSearchFromDate,
+          toDate: leaveSearchToDate,
+        },
+        headers: { Authorization: `Bearer ${accessToken}` },
+        signal: controller.signal,
+      })
+      if (error) {
+        let message = error.message || 'Unable to search VSP leave records.'
+        try {
+          const details = await error.context?.json()
+          if (details?.error) message = details.error
+        } catch { /* Keep the function client error above. */ }
+        setLeaveSearchError(message)
+      } else if (!result?.success) {
+        setLeaveSearchError(result?.error || 'The VSP leave search failed.')
+      } else {
+        setLeaveSearchResult(result)
+        showSuccessAlert(`Found ${result.resultCount || 0} approved leave period(s) for ${employeeCode}.`)
+      }
+    } catch (error) {
+      setLeaveSearchError(error?.name === 'AbortError'
+        ? 'The VSP leave search did not finish within 60 seconds.'
+        : error?.message || 'Unable to search VSP leave records.')
+    } finally {
+      window.clearTimeout(timeout)
+      setLeaveSearchBusy(false)
+    }
+  }
   const getVspMeetingInfo = async (dryRun = false) => {
     setMeetingBusy(true); setMeetingResult(null); setMeetingError('')
     const { data: result, error } = await supabase.functions.invoke('test-vsp-meeting-info', { body: { date: meetingDate, dryRun } })
@@ -195,6 +255,30 @@ export default function AdminPage({ data, profile, goBack }) {
         </div>}
         {vspError && <p className="form-error">{vspError}</p>}
         {vspResult && <pre className="vsp-test-result">{JSON.stringify(vspResult, null, 2)}</pre>}
+      </section>
+      <section className="push-test-panel vsp-employee-leave-search">
+        <div><p className="eyebrow">SEARCH EMPLOYEE VSP LEAVE</p><b>Find approved leave by employee and leave period</b><small>This is a read-only search. It does not change Daily Status or send notifications.</small></div>
+        <div className="vsp-leave-search-fields">
+          <label>Employee number<input value={leaveSearchEmployeeCode} maxLength="30" onChange={event => setLeaveSearchEmployeeCode(event.target.value.toUpperCase())} placeholder="Example: 16042 or 07HDDK" disabled={leaveSearchBusy} /></label>
+          <label>From<input type="date" value={leaveSearchFromDate} onChange={event => setLeaveSearchFromDate(event.target.value)} disabled={leaveSearchBusy} /></label>
+          <label>To<input type="date" min={leaveSearchFromDate || undefined} value={leaveSearchToDate} onChange={event => setLeaveSearchToDate(event.target.value)} disabled={leaveSearchBusy} /></label>
+          <button className="primary-button" type="button" disabled={leaveSearchBusy} onClick={searchEmployeeVspLeave}>{leaveSearchBusy ? 'Searching...' : 'Search VSP leave'}</button>
+        </div>
+        {leaveSearchError && <p className="form-error">{leaveSearchError}</p>}
+        {leaveSearchResult && <div className="vsp-leave-search-results">
+          <div className="vsp-leave-search-summary"><b>{leaveSearchResult.resultCount} matching leave period(s)</b><span>{leaveSearchResult.employeeCode} · {formatSearchDate(leaveSearchResult.fromDate)}–{formatSearchDate(leaveSearchResult.toDate)} · {leaveSearchResult.upstreamRequestCount} VSP request(s) · Read only</span></div>
+          {leaveSearchResult.records?.length ? <div className="meeting-sync-log-table-wrap"><table className="meeting-sync-log-table vsp-leave-search-table">
+            <thead><tr><th>Type</th><th>Request</th><th>Employee</th><th>From</th><th>To</th><th>Days</th><th>Hours</th><th>Approved</th><th>Status</th><th>Location</th></tr></thead>
+            <tbody>{leaveSearchResult.records.map(record => <tr key={record.id}>
+              <td>{record.leaveType === 'compensatory_leave' ? 'Compensatory leave' : 'Annual leave'}</td>
+              <td>{record.requestId ?? '—'}</td>
+              <td><b>{record.employeeName || '—'}</b><small>{record.employeeCode}</small></td>
+              <td>{formatSearchDate(record.startDate)}</td><td>{formatSearchDate(record.endDate)}</td>
+              <td>{Number.isFinite(record.leaveDays) ? record.leaveDays : '—'}</td><td>{Number.isFinite(record.hours) ? record.hours : '—'}</td>
+              <td>{formatSearchDate(record.approvalDate)}</td><td>{record.statusName || 'Approved'}</td><td>{record.location || '—'}</td>
+            </tr>)}</tbody>
+          </table></div> : <p className="empty">No approved leave periods overlap the selected date range.</p>}
+        </div>}
       </section>
       <section className="meeting-sync-log-panel">
         <header>

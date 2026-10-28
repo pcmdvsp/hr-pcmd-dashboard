@@ -4,6 +4,10 @@ import {
   compensatoryApprovalDate,
   normalizeCompensatoryRecord,
 } from "./compensatory-leave.js";
+import {
+  buildLeaveSearchRows,
+  searchRangeIsWithinDays,
+} from "./employee-leave-search.js";
 
 const VSP_BASE_URL = "https://phep.vietsov.com.vn";
 const APPROVED_STATUS_IDS = [142];
@@ -504,6 +508,114 @@ const fetchCompensatoryLeaves = async (
   return { records, upstreamTotal, upstreamPageCount, skippedEmployeeCodes };
 };
 
+const searchEmployeeLeaves = async (
+  token: string,
+  employeeCode: string,
+  fromDate: string,
+  toDate: string,
+) => {
+  const regularRecords: unknown[] = [];
+  const pageSize = 100;
+  const maxPages = 10;
+  let regularTotal = 0;
+  let regularPageCount = 0;
+  let fetchedCount = 0;
+  let pageNumber = 1;
+  while (pageNumber <= maxPages) {
+    const upstream = await fetchWithTimeout(
+      `${VSP_BASE_URL}/api/Phep/DanhSachGNPFilter`,
+      {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pageNumber,
+          pageSize,
+          // VSP's date filters exclude a leave period that only overlaps a
+          // boundary (for example 26-30 Oct when searching 23-26 Oct). Fetch
+          // this employee's approved records and apply overlap locally.
+          fromLeaveDateFilter: null,
+          toLeaveDateFilter: null,
+          trangThai_ids: APPROVED_STATUS_IDS,
+          languageId: "VI",
+          nameFilter: employeeCode,
+        }),
+      },
+    );
+    const page = extractLeavePage(await readUpstreamJson(
+      upstream,
+      `VSP approved leave search for ${employeeCode} page ${pageNumber}`,
+    ));
+    regularRecords.push(...page.records);
+    fetchedCount += page.records.length;
+    if (pageNumber === 1) regularTotal = page.total;
+    regularPageCount += 1;
+    if (page.records.length < pageSize || fetchedCount >= page.total) break;
+    pageNumber += 1;
+  }
+  if (pageNumber > maxPages)
+    throw new Error(`VSP approved leave search exceeded ${maxPages} pages.`);
+
+  const exactRegularRecords = regularRecords.filter((record) =>
+    isRecord(record) && normalizeEmployeeCode(record.danhSo) === employeeCode &&
+    (record.trangThai_id === undefined || APPROVED_STATUS_IDS.includes(Number(record.trangThai_id)))
+  );
+  const regularRows = buildLeaveSearchRows(exactRegularRecords, {
+    leaveType: "annual_leave",
+    employeeCode,
+    fromDate,
+    toDate,
+  });
+
+  const compensatoryUpstream = await fetchCompensatoryLeaves(token, null, [employeeCode]);
+  const normalizedCompensatoryRecords = compensatoryUpstream.records.flatMap((record) => {
+    if (!isRecord(record) || Number(record.trangThai_id) !== APPROVED_COMPENSATORY_STATUS_ID ||
+      normalizeEmployeeCode(record.danhSo) !== employeeCode) return [];
+    const normalized = normalizeCompensatoryRecord(record);
+    if (!normalized) return [];
+    return [{
+      ...normalized,
+      trangThai_id: record.trangThai_id,
+      tenTrangThai: record.tenTrangThai ?? record.trangThai ?? "Approved",
+      ngayKy: compensatoryApprovalDate(record),
+    }];
+  });
+  const compensatoryRows = buildLeaveSearchRows(normalizedCompensatoryRecords, {
+    leaveType: "compensatory_leave",
+    employeeCode,
+    fromDate,
+    toDate,
+  });
+  const uniqueRows = [...new Map<string, Record<string, unknown>>(
+    [...regularRows, ...compensatoryRows].map((row: Record<string, unknown>): [string, Record<string, unknown>] => [String(row.id), row]),
+  ).values()].sort((left, right) =>
+    String(left.startDate).localeCompare(String(right.startDate)) ||
+    String(left.leaveType).localeCompare(String(right.leaveType))
+  );
+
+  return {
+    records: uniqueRows,
+    regular: {
+      upstreamTotal: regularTotal,
+      upstreamRecordCount: regularRecords.length,
+      pageCount: regularPageCount,
+      matchedPeriodCount: regularRows.length,
+    },
+    compensatory: {
+      upstreamTotal: compensatoryUpstream.upstreamTotal,
+      upstreamRecordCount: compensatoryUpstream.records.length,
+      pageCount: compensatoryUpstream.upstreamPageCount,
+      matchedPeriodCount: compensatoryRows.length,
+      employeeNotFound: compensatoryUpstream.skippedEmployeeCodes.includes(employeeCode),
+    },
+    // One login, regular-leave pages, one employee lookup, and compensatory-list pages.
+    upstreamRequestCount: 2 + regularPageCount + compensatoryUpstream.upstreamPageCount,
+  };
+};
+
 Deno.serve(async (request) => {
   const startedAt = new Date();
   if (request.method === "OPTIONS")
@@ -550,12 +662,35 @@ Deno.serve(async (request) => {
   let selectedDate = vietnamToday();
   let dryRun = false;
   let requestedEmployeeCodes: string[] = [];
+  let action: "approval_date" | "employee_range_search" = "approval_date";
+  let searchEmployeeCode = "";
+  let searchFromDate = "";
+  let searchToDate = "";
   let scheduleMode: "today" | "yesterday" = "today";
   try {
     const text = await request.text();
     const body = text.trim() ? JSON.parse(text) : {};
     if (!isRecord(body))
       return jsonResponse({ success: false, error: "Request body must be a JSON object." }, 400);
+    if (body.action !== undefined) {
+      if (body.action !== "approval_date" && body.action !== "employee_range_search")
+        return jsonResponse({ success: false, error: "Unsupported VSP leave action." }, 400);
+      action = body.action;
+    }
+    if (action === "employee_range_search") {
+      if (cronRequest)
+        return jsonResponse({ success: false, error: "Employee leave search is not available to scheduled requests." }, 400);
+      searchEmployeeCode = normalizeEmployeeCode(body.employeeCode);
+      searchFromDate = typeof body.fromDate === "string" ? body.fromDate : "";
+      searchToDate = typeof body.toDate === "string" ? body.toDate : "";
+      if (!searchEmployeeCode || searchEmployeeCode.length > 30)
+        return jsonResponse({ success: false, error: "Enter one valid employee number with at most 30 characters." }, 400);
+      if (!validDate(searchFromDate) || !validDate(searchToDate))
+        return jsonResponse({ success: false, error: "From and To dates must use YYYY-MM-DD format." }, 400);
+      if (!searchRangeIsWithinDays(searchFromDate, searchToDate))
+        return jsonResponse({ success: false, error: "The date range must run from earlier to later and contain no more than 366 days." }, 400);
+      dryRun = true;
+    }
     if (body.date !== undefined && body.date !== null && body.date !== "") {
       if (!validDate(body.date))
         return jsonResponse({ success: false, error: "Date must use YYYY-MM-DD format." }, 400);
@@ -622,6 +757,25 @@ Deno.serve(async (request) => {
 
   try {
     const { token, email } = await loginToVspLeave(username, password);
+    if (action === "employee_range_search") {
+      const search = await searchEmployeeLeaves(
+        token,
+        searchEmployeeCode,
+        searchFromDate,
+        searchToDate,
+      );
+      return jsonResponse({
+        success: true,
+        action,
+        mode: "search",
+        readOnly: true,
+        employeeCode: searchEmployeeCode,
+        fromDate: searchFromDate,
+        toDate: searchToDate,
+        resultCount: search.records.length,
+        ...search,
+      });
+    }
     let scopedFilters: Record<string, unknown> = { ...filters };
     let departmentId: string | number | null = null;
     if (!requestedEmployeeCodes.length) {
