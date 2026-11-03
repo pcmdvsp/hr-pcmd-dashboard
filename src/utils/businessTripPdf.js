@@ -1,4 +1,4 @@
-import { findEmployeeCode, findEmployeeCodeCell, normalizeEmployeeCode } from "./employeeCode";
+import { findEmployeeCode, findEmployeeCodeCell, normalizeEmployeeCode } from "./employeeCode.js";
 
 const normalize = (value = "") => value.replace(/\s+/g, " ").trim();
 
@@ -16,12 +16,61 @@ const toIsoDate = (value) => {
   return `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
 };
 
-const valueAfterLabel = (text, labels, stopLabels) => {
+export const valueAfterLabel = (text, labels, stopLabels) => {
   const labelPattern = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
   const stopPattern = stopLabels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-  const match = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*(.+?)(?=\\s+(?:${stopPattern})\\s*:?|$)`, "i"));
+  const match = text.match(new RegExp(`(?:${labelPattern})\\s*:?\\s*(.+?)(?=\\s+(?:[•▪◦]\\s*)?(?:${stopPattern})\\s*:?|$)`, "i"));
   return normalize(match?.[1] || "") || null;
 };
+
+export const parseCondensedDateRange = (value) => {
+  const match = value?.match(/\b(\d{1,2})\s*[-–—]\s*(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{4})\b/);
+  if (!match) return null;
+  const [, startDay, endDay, month, year] = match;
+  const toDate = (day) => {
+    const iso = `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    const parsed = new Date(`${iso}T00:00:00Z`);
+    return parsed.getUTCFullYear() === Number(year) &&
+      parsed.getUTCMonth() + 1 === Number(month) &&
+      parsed.getUTCDate() === Number(day) ? iso : null;
+  };
+  const departureDate = toDate(startDay);
+  const returnDate = toDate(endDay);
+  return departureDate && returnDate && returnDate >= departureDate
+    ? { departureDate, returnDate }
+    : null;
+};
+
+const findCondensedDateRangeNear = (text, labels) => {
+  for (const label of labels) {
+    const index = text.toLocaleLowerCase("vi").indexOf(label.toLocaleLowerCase("vi"));
+    if (index >= 0) {
+      const range = parseCondensedDateRange(text.slice(index, index + 180));
+      if (range) return range;
+    }
+  }
+  return null;
+};
+
+export const resolveTravelDateRange = (text, layout = {}) => {
+  const condensedDateRange = findCondensedDateRangeNear(text, ["Thời gian", "Ngày đi", "Từ ngày"]);
+  return {
+    departureDate: condensedDateRange?.departureDate || layout.departureDate || findDateNear(text, ["Ngày đi", "Thời gian đi", "Từ ngày"]),
+    returnDate: condensedDateRange?.returnDate || layout.returnDate || findDateNear(text, ["Ngày về", "Thời gian trở về", "Thời gian về", "Đến ngày"]),
+  };
+};
+
+const cleanLocation = (value) => {
+  const normalized = normalize(value || "").replace(/^[•▪◦]\s*/, "");
+  const beforeNextBullet = normalized.split(/\s*[•▪◦]\s*/)[0];
+  return beforeNextBullet.replace(/[.;,:]\s*$/, "") || null;
+};
+
+export const extractLocationFromText = (text) => cleanLocation(valueAfterLabel(
+  text,
+  ["Địa điểm công tác", "Nơi công tác", "Địa điểm"],
+  ["Chi phí", "Kinh phí", "Ngày đi", "Ngày về", "Thời gian", "Phương tiện", "Thành phần"],
+));
 
 const findDateNear = (text, labels) => {
   for (const label of labels) {
@@ -82,7 +131,11 @@ const findRow = (rows, phrase) => rows.findIndex((row, index) => {
 const sectionValue = (rows, label, nextLabel, minimumX = 250) => {
   const start = findRow(rows, label);
   if (start < 0) return null;
-  const end = nextLabel ? findRow(rows.slice(start + 1), nextLabel) : -1;
+  const nextLabels = Array.isArray(nextLabel) ? nextLabel : nextLabel ? [nextLabel] : [];
+  const end = nextLabels
+    .map((candidate) => findRow(rows.slice(start + 1), candidate))
+    .filter((index) => index >= 0)
+    .sort((a, b) => a - b)[0] ?? -1;
   const stop = end < 0 ? Math.min(rows.length, start + 5) : start + 1 + end;
   return normalize(rows.slice(start, stop).map((row, index) => {
     const colonCell = index === 0
@@ -101,7 +154,7 @@ const parseLayoutFields = (rows) => {
   const returnDate = toIsoDate(returnText);
   return {
     content: sectionValue(rows, "Mục đích chuyến đi", "Danh sách CBCNV", 255),
-    location: sectionValue(rows, "Địa điểm công tác", "Phương tiện", 260),
+    location: cleanLocation(sectionValue(rows, "Địa điểm công tác", ["Chi phí", "Kinh phí", "Phương tiện"], 260)),
     departureDate,
     returnDate,
   };
@@ -243,13 +296,8 @@ export async function parseBusinessTripPdf(file) {
     ["Nội dung công tác", "Mục đích công tác", "Nội dung"],
     ["Địa điểm", "Nơi công tác", "Ngày đi", "Thời gian", "Thành phần"],
   );
-  const location = layout.location || valueAfterLabel(
-    text,
-    ["Địa điểm công tác", "Nơi công tác", "Địa điểm"],
-    ["Ngày đi", "Ngày về", "Thời gian", "Phương tiện", "Thành phần"],
-  );
-  const departureDate = layout.departureDate || findDateNear(text, ["Ngày đi", "Thời gian đi", "Từ ngày"]);
-  const returnDate = layout.returnDate || findDateNear(text, ["Ngày về", "Thời gian trở về", "Thời gian về", "Đến ngày"]);
+  const location = cleanLocation(layout.location) || extractLocationFromText(text);
+  const { departureDate, returnDate } = resolveTravelDateRange(text, layout);
   const tableParticipants = individualOrder ? [] : parseTableParticipants(rows);
   const coordinateParticipants = individualOrder ? [] : parseCoordinateParticipants(rows);
   const parsedParticipants = individualOrder?.participants?.length
