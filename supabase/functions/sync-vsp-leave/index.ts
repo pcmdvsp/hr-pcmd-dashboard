@@ -662,6 +662,7 @@ Deno.serve(async (request) => {
   let selectedDate = vietnamToday();
   let dryRun = false;
   let requestedEmployeeCodes: string[] = [];
+  let requestedScope: "target_unit" | "all_vsp" = "target_unit";
   let action: "approval_date" | "employee_range_search" = "approval_date";
   let searchEmployeeCode = "";
   let searchFromDate = "";
@@ -676,6 +677,11 @@ Deno.serve(async (request) => {
       if (body.action !== "approval_date" && body.action !== "employee_range_search")
         return jsonResponse({ success: false, error: "Unsupported VSP leave action." }, 400);
       action = body.action;
+    }
+    if (body.scope !== undefined) {
+      if (body.scope !== "target_unit" && body.scope !== "all_vsp")
+        return jsonResponse({ success: false, error: "Unsupported VSP leave scope." }, 400);
+      requestedScope = body.scope;
     }
     if (action === "employee_range_search") {
       if (cronRequest)
@@ -712,6 +718,12 @@ Deno.serve(async (request) => {
       scheduleMode = body.mode;
       selectedDate = vietnamDateOffset(body.mode === "yesterday" ? -1 : 0);
       dryRun = false;
+    }
+    if (requestedScope === "all_vsp") {
+      if (action !== "approval_date" || cronRequest || !dryRun)
+        return jsonResponse({ success: false, error: "The all-VSP scope is available for manual tests only." }, 400);
+      if (requestedEmployeeCodes.length)
+        return jsonResponse({ success: false, error: "The all-VSP scope cannot be combined with employee numbers." }, 400);
     }
     requestedFilters = isRecord(body.filters) ? body.filters : {};
   } catch {
@@ -776,9 +788,10 @@ Deno.serve(async (request) => {
         ...search,
       });
     }
+    const allVspTest = requestedScope === "all_vsp";
     let scopedFilters: Record<string, unknown> = { ...filters };
     let departmentId: string | number | null = null;
-    if (!requestedEmployeeCodes.length) {
+    if (!requestedEmployeeCodes.length && !allVspTest) {
       const departmentScope = await getVspDepartmentScope(token, email);
       if (
         departmentScope === null || departmentScope === undefined ||
@@ -838,7 +851,9 @@ Deno.serve(async (request) => {
     const employeeCodeSet = new Set(requestedEmployeeCodes);
     const matchingRecords = allRecords.filter((record) =>
       approvedOnDate(record, selectedDate) &&
-      (employeeCodeSet.size
+      (allVspTest
+        ? true
+        : employeeCodeSet.size
         ? employeeCodeSet.has(normalizeEmployeeCode(record.danhSo))
         : belongsToTargetUnit(record))
     );
@@ -849,11 +864,16 @@ Deno.serve(async (request) => {
       seenExternalIds.add(externalId);
       return true;
     });
-    const compensatoryUpstream = await fetchCompensatoryLeaves(
-      token,
-      departmentId,
-      requestedEmployeeCodes,
-    );
+    // VSP's compensatory-leave list requires a BoPhan_id. Do not mix the
+    // current department's compensatory records into an all-VSP result.
+    const compensatoryUpstream = allVspTest
+      ? {
+          records: [] as unknown[],
+          upstreamTotal: 0,
+          upstreamPageCount: 0,
+          skippedEmployeeCodes: [] as string[],
+        }
+      : await fetchCompensatoryLeaves(token, departmentId, requestedEmployeeCodes);
     const compensatoryRawRecords = compensatoryUpstream.records.filter((record) =>
       isRecord(record) &&
       Number(record.trangThai_id) === APPROVED_COMPENSATORY_STATUS_ID &&
@@ -913,22 +933,30 @@ Deno.serve(async (request) => {
       success: true,
       endpoints: [
         "/api/Phep/DanhSachGNPFilter",
-        requestedEmployeeCodes.length
-          ? "/api/PhepBu/DanhSachDon"
-          : "/api/PhepBu/DanhSachDonByBoPhan",
+        ...(!allVspTest
+          ? [requestedEmployeeCodes.length
+              ? "/api/PhepBu/DanhSachDon"
+              : "/api/PhepBu/DanhSachDonByBoPhan"]
+          : []),
       ],
       mode: dryRun ? "test" : "sync",
       runType: cronRequest ? "scheduled" : "manual",
       selectedDate,
-      unit: requestedEmployeeCodes.length ? null : TARGET_UNIT,
+      unit: requestedEmployeeCodes.length || allVspTest ? null : TARGET_UNIT,
       employeeCodes: requestedEmployeeCodes,
-      scope: requestedEmployeeCodes.length ? "employee_numbers" : "target_unit",
+      scope: allVspTest
+        ? "all_vsp"
+        : requestedEmployeeCodes.length ? "employee_numbers" : "target_unit",
       filters: requestedEmployeeCodes.length
         ? { ...scopedFilters, nameFilter: requestedEmployeeCodes }
         : scopedFilters,
       approvalDateField: "ngayKy",
       compensatoryApprovalStatusId: APPROVED_COMPENSATORY_STATUS_ID,
       compensatoryDaySource: "VSP soNgay with tuNgay and denNgay",
+      compensatoryIncluded: !allVspTest,
+      warnings: allVspTest
+        ? ["Compensatory leave is not included because the VSP API requires a department scope."]
+        : [],
       compensatorySkippedEmployeeCodes: compensatoryUpstream.skippedEmployeeCodes,
       upstreamRecordCount,
       upstreamTotal: upstreamTotal + compensatoryUpstream.upstreamTotal,

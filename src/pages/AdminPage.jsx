@@ -79,10 +79,11 @@ export default function AdminPage({ data, profile, goBack }) {
     catch (error) { setPushMessage(error.message || 'Unable to send the test notification.') }
     setPushBusy(false)
   }
-  const testVspLeave = async (dryRun = false, employeeCodes = []) => {
+  const testVspLeave = async (dryRun = false, employeeCodes = [], scope = 'target_unit') => {
     setVspBusy(true); setVspResult(null); setVspError('')
     const controller = new AbortController()
-    const timeout = window.setTimeout(() => controller.abort(), 45_000)
+    const timeoutMs = scope === 'all_vsp' ? 120_000 : 45_000
+    const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
     try {
       const { data: sessionData, error: sessionError } = await supabase.auth.refreshSession()
       const accessToken = sessionData?.session?.access_token
@@ -91,7 +92,7 @@ export default function AdminPage({ data, profile, goBack }) {
         return
       }
       const { data: result, error } = await supabase.functions.invoke('sync-vsp-leave', {
-        body: { date: vspLeaveDate, dryRun, ...(employeeCodes.length ? { employeeCodes } : {}) },
+        body: { date: vspLeaveDate, dryRun, scope, ...(employeeCodes.length ? { employeeCodes } : {}) },
         headers: { Authorization: `Bearer ${accessToken}` },
         signal: controller.signal,
       })
@@ -111,13 +112,15 @@ export default function AdminPage({ data, profile, goBack }) {
         const count = Array.isArray(raw) ? raw.length : raw?.total
         const changedDays = (result?.sync?.createdDayCount ?? 0) + (result?.sync?.updatedDayCount ?? 0)
         showSuccessAlert(dryRun
-          ? `VSP leave test returned${Number.isFinite(count) ? ` ${count} approved record(s)` : ' JSON data'}. No data was synchronized.`
+          ? `${scope === 'all_vsp' ? 'All-VSP' : 'VSP'} leave test returned${Number.isFinite(count) ? ` ${count} approved record(s)` : ' JSON data'}. No data was synchronized.`
           : `VSP leave API returned${Number.isFinite(count) ? ` ${count} record(s)` : ' JSON data'} and synchronized ${changedDays} leave day(s).`)
         if (!dryRun && changedDays) await reload()
       }
     } catch (error) {
       setVspError(error?.name === 'AbortError'
-        ? 'The VSP leave test did not finish within 45 seconds. Please try fewer employee numbers.'
+        ? scope === 'all_vsp'
+          ? 'The all-VSP leave test did not finish within 120 seconds.'
+          : 'The VSP leave test did not finish within 45 seconds. Please try fewer employee numbers.'
         : error?.message || 'Unable to test the VSP leave API.')
     } finally {
       window.clearTimeout(timeout)
@@ -244,7 +247,7 @@ export default function AdminPage({ data, profile, goBack }) {
           <input id="vsp-leave-test-date" type="date" value={vspLeaveDate} onChange={event => setVspLeaveDate(event.target.value)} disabled={vspBusy} aria-describedby="vsp-leave-test-date-help" />
           <small id="vsp-leave-test-date-help">Find records whose ngayKy is on this date. Leave blank to use today in Vietnam (UTC+7).</small>
         </div>
-        <div className="vsp-action-buttons"><button className="primary-button vsp-get-button" type="button" disabled={vspBusy} onClick={() => testVspLeave(false)}>{vspBusy ? 'Working...' : 'Get VSP leave info'}</button><button className="secondary-button" type="button" disabled={vspBusy} onClick={() => setVspLeaveTestOpen(true)}>{vspBusy ? 'Working...' : 'Test VSP leave'}</button></div>
+        <div className="vsp-action-buttons"><button className="primary-button vsp-get-button" type="button" disabled={vspBusy} onClick={() => testVspLeave(false)}>{vspBusy ? 'Working...' : 'Get VSP leave info'}</button><button className="secondary-button" type="button" disabled={vspBusy} onClick={() => setVspLeaveTestOpen(true)}>{vspBusy ? 'Working...' : 'Test VSP leave'}</button><button className="secondary-button" type="button" disabled={vspBusy} onClick={() => testVspLeave(true, [], 'all_vsp')}>{vspBusy ? 'Working...' : 'Test all VSP leave'}</button></div>
         {vspLeaveTestOpen && <div className="vsp-leave-test-box" role="group" aria-labelledby="vsp-leave-test-title">
           <div className="vsp-leave-test-heading"><div><p className="eyebrow">VSP LEAVE TEST</p><h3 id="vsp-leave-test-title">Test employee numbers</h3></div><button className="close" type="button" aria-label="Close" onClick={() => setVspLeaveTestOpen(false)}>×</button></div>
           <p>Enter one or more employee numbers to test them directly, including employees outside Ban QLHĐDK.</p>
@@ -267,17 +270,13 @@ export default function AdminPage({ data, profile, goBack }) {
         {leaveSearchError && <p className="form-error">{leaveSearchError}</p>}
         {leaveSearchResult && <div className="vsp-leave-search-results">
           <div className="vsp-leave-search-summary"><b>{leaveSearchResult.resultCount} matching leave period(s)</b><span>{leaveSearchResult.employeeCode} · {formatSearchDate(leaveSearchResult.fromDate)}–{formatSearchDate(leaveSearchResult.toDate)} · {leaveSearchResult.upstreamRequestCount} VSP request(s) · Read only</span></div>
-          {leaveSearchResult.records?.length ? <div className="meeting-sync-log-table-wrap"><table className="meeting-sync-log-table vsp-leave-search-table">
-            <thead><tr><th>Type</th><th>Request</th><th>Employee</th><th>From</th><th>To</th><th>Days</th><th>Hours</th><th>Approved</th><th>Status</th><th>Location</th></tr></thead>
-            <tbody>{leaveSearchResult.records.map(record => <tr key={record.id}>
-              <td>{record.leaveType === 'compensatory_leave' ? 'Compensatory leave' : 'Annual leave'}</td>
-              <td>{record.requestId ?? '—'}</td>
-              <td><b>{record.employeeName || '—'}</b><small>{record.employeeCode}</small></td>
-              <td>{formatSearchDate(record.startDate)}</td><td>{formatSearchDate(record.endDate)}</td>
-              <td>{Number.isFinite(record.leaveDays) ? record.leaveDays : '—'}</td><td>{Number.isFinite(record.hours) ? record.hours : '—'}</td>
-              <td>{formatSearchDate(record.approvalDate)}</td><td>{record.statusName || 'Approved'}</td><td>{record.location || '—'}</td>
-            </tr>)}</tbody>
-          </table></div> : <p className="empty">No approved leave periods overlap the selected date range.</p>}
+          <pre className="vsp-test-result">{JSON.stringify({
+            employeeCode: leaveSearchResult.employeeCode,
+            fromDate: leaveSearchResult.fromDate,
+            toDate: leaveSearchResult.toDate,
+            resultCount: leaveSearchResult.resultCount,
+            approvedLeaves: leaveSearchResult.records || [],
+          }, null, 2)}</pre>
         </div>}
       </section>
       <section className="meeting-sync-log-panel">

@@ -18,6 +18,14 @@ Function. Scheduled runs write safe operational counts and error summaries to
 `vsp_leave_sync_logs`; manual Admin Get/Test requests are not logged. Admins can
 view the latest 20 runs in **VSP LEAVE SYNC HISTORY**.
 
+The manual **Test all VSP leave** action is read-only. It omits
+`currentDepartmentFilter`, keeps approved regular-leave records whose `ngayKy`
+matches **Approval date**, and never writes Daily Status or notifications. If
+Approval date is blank, the Function uses today's date in Vietnam. The VSP
+compensatory-leave API requires a department ID, so compensatory leave is not
+included in this all-company diagnostic; the JSON response reports this with
+`compensatoryIncluded: false` and a warning.
+
 ```sql
 select cron.unschedule(jobid)
 from cron.job
