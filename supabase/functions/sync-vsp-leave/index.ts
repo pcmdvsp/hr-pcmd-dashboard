@@ -8,6 +8,7 @@ import {
   buildLeaveSearchRows,
   searchRangeIsWithinDays,
 } from "./employee-leave-search.js";
+import { annualLeaveApprovalDate } from "./approval-date.js";
 
 const VSP_BASE_URL = "https://phep.vietsov.com.vn";
 const APPROVED_STATUS_IDS = [142];
@@ -78,8 +79,7 @@ const belongsToTargetUnit = (value: unknown): value is Record<string, unknown> =
   isRecord(value) && value.donVi === TARGET_UNIT;
 
 const approvedOnDate = (value: unknown, selectedDate: string): value is Record<string, unknown> =>
-  isRecord(value) && typeof value.ngayKy === "string" &&
-  value.ngayKy.slice(0, 10) === selectedDate;
+  isRecord(value) && annualLeaveApprovalDate(value) === selectedDate;
 
 const normalizeEmployeeCode = (value: unknown) =>
   typeof value === "string" ? value.trim().toUpperCase() : "";
@@ -926,7 +926,8 @@ Deno.serve(async (request) => {
       filters: requestedEmployeeCodes.length
         ? { ...scopedFilters, nameFilter: requestedEmployeeCodes }
         : scopedFilters,
-      approvalDateField: "ngayKy",
+      approvalDateField: "last confirmed nguoiKyDon/nguoiKys.ngayKy; fallback record.ngayKy",
+      approvalDateTimeZone: "Asia/Ho_Chi_Minh",
       compensatoryApprovalStatusId: APPROVED_COMPENSATORY_STATUS_ID,
       compensatoryDaySource: "VSP soNgay with tuNgay and denNgay",
       compensatorySkippedEmployeeCodes: compensatoryUpstream.skippedEmployeeCodes,

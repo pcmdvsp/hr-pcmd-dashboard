@@ -1,3 +1,5 @@
+import { annualLeaveApprovalDate } from "./approval-date.js";
+
 const isRecord = (value) =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -59,7 +61,7 @@ export const buildLeaveSearchRows = (
       endDate,
       leaveDays: finiteNumber(period.leaveDays, period.soNgay, period.soNgayNghi),
       hours: finiteNumber(period.compensatoryHours, period.soGio, period.soGioNghi),
-      approvalDate: dateOnly(record.ngayKy ?? record.ngayPheDuyet ?? record.ngayChapNhan),
+      approvalDate: annualLeaveApprovalDate(record),
       location: typeof record.noiNghiPhep === "string" ? record.noiNghiPhep.trim() : "",
     }];
   });

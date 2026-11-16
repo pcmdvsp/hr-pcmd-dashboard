@@ -8,6 +8,7 @@ import {
 test("uses the final approval signature date for compensatory leave", () => {
   assert.equal(compensatoryApprovalDate({
     trangThai_id: 187,
+    ngayKy: "2026-09-13T08:00:00",
     nguoiKys: [
       { trangThai_id: 185, ngayKy: "2026-09-14T08:00:00", daDuyet: true },
       { trangThai_id: 186, ngayKy: "2026-09-15T09:30:00", daDuyet: true },

@@ -31,6 +31,31 @@ test("returns only exact employee matches and overlapping periods", () => {
   assert.equal(rows[0].leaveDays, 5);
 });
 
+test("returns the last confirmed signature as the approval date", () => {
+  const rows = buildLeaveSearchRows([{
+    donNghiPhep_id: 18351,
+    danhSo: "18351",
+    ngayKy: "2026-11-07T08:00:00",
+    nguoiKyDon: [
+      { ngayKy: "2026-11-08T10:00:00", daDuyet: true },
+      { ngayKy: "2026-11-09T15:16:00", daDuyet: true },
+    ],
+    thongTinPhepCTs: [{
+      id: 1,
+      tuNgay: "2026-11-16T00:00:00",
+      denNgay: "2026-11-16T00:00:00",
+    }],
+  }], {
+    leaveType: "annual_leave",
+    employeeCode: "18351",
+    fromDate: "2026-11-16",
+    toDate: "2026-11-16",
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].approvalDate, "2026-11-09");
+});
+
 test("finds a leave period that starts on the search end date and continues later", () => {
   const rows = buildLeaveSearchRows([{
     donNghiPhep_id: 21207,

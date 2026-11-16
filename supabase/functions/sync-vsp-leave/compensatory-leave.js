@@ -1,29 +1,19 @@
+import { approvalDateWithSignerFilter, vietnamDateOnly } from "./approval-date.js";
+
 export const APPROVED_COMPENSATORY_STATUS_ID = 187;
 export const COMPENSATORY_FINAL_APPROVER_STATUS_ID = 186;
 
 const isRecord = (value) =>
   typeof value === "object" && value !== null && !Array.isArray(value);
 
-const dateOnly = (value) =>
-  typeof value === "string" && /^\d{4}-\d{2}-\d{2}/.test(value)
-    ? value.slice(0, 10)
-    : null;
+const dateOnly = vietnamDateOnly;
 
 export const compensatoryApprovalDate = (value) => {
   if (!isRecord(value)) return null;
-  for (const field of ["ngayKy", "ngayPheDuyet", "ngayChapNhan"]) {
-    const date = dateOnly(value[field]);
-    if (date) return date;
-  }
-  if (!Array.isArray(value.nguoiKys)) return null;
-  const finalApprovals = value.nguoiKys
-    .filter((signer) => isRecord(signer) &&
-      Number(signer.trangThai_id) === COMPENSATORY_FINAL_APPROVER_STATUS_ID &&
-      signer.daDuyet !== false)
-    .map((signer) => dateOnly(signer.ngayKy))
-    .filter(Boolean)
-    .sort();
-  return finalApprovals.at(-1) ?? null;
+  return approvalDateWithSignerFilter(
+    value,
+    (signer) => Number(signer.trangThai_id) === COMPENSATORY_FINAL_APPROVER_STATUS_ID,
+  );
 };
 
 export const normalizeCompensatoryRecord = (value) => {
